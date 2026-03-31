@@ -230,7 +230,7 @@ function updateScoreUI() {
 
 function updateStatus() {
   if (aiThinking)  {
-    statusText.textContent = "Ходd компьютера: O";
+    statusText.textContent = "Ход компьютера: O";
     return;
   }
 
