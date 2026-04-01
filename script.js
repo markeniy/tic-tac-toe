@@ -4,8 +4,11 @@ const gameScreen = document.getElementById("gameScreen");
 const twoPlayersBtn = document.getElementById("twoPlayersBtn");
 const aiModeBtn = document.getElementById("aiModeBtn");
 const variantPicker = document.getElementById("variantPicker");
+const variantPickerTitle = document.getElementById("variantPickerTitle");
 const standardVariantBtn = document.getElementById("standardVariantBtn");
 const chaosVariantBtn = document.getElementById("chaosVariantBtn");
+const pickerDifficultyPanel = document.getElementById("pickerDifficultyPanel");
+const startAiVariantBtn = document.getElementById("startAiVariantBtn");
 const closeVariantPickerBtn = document.getElementById("closeVariantPickerBtn");
 const backBtn = document.getElementById("backBtn");
 const newRoundBtn = document.getElementById("newRoundBtn");
@@ -19,6 +22,7 @@ const hardDifficultyBtn = document.getElementById("hardDifficultyBtn");
 
 const boardNode = document.getElementById("board");
 const statusText = document.getElementById("status");
+const resultBanner = document.getElementById("resultBanner");
 const modeLabel = document.getElementById("modeLabel");
 const difficultyBadge = document.getElementById("difficultyBadge");
 
@@ -33,6 +37,7 @@ const playAgainBtn = document.getElementById("playAgainBtn");
 
 let cells = [];
 let winPatterns = [];
+let chaosPatterns = [];
 let board = [];
 let boardSize = 3;
 let currentPlayer = "X";
@@ -40,6 +45,7 @@ let gameActive = false;
 let gameMode = "pvp";
 let aiThinking = false;
 let pendingMenuMode = null;
+let pendingVariant = null;
 let boardLocked = false;
 let currentTheme = localStorage.getItem("ticTacToeTheme") || "dark";
 let soundEnabled = localStorage.getItem("ticTacToeSound") !== "off";
@@ -60,6 +66,7 @@ twoPlayersBtn.addEventListener("click", () => openVariantPicker("pvp"));
 aiModeBtn.addEventListener("click", () => openVariantPicker("ai"));
 standardVariantBtn.addEventListener("click", () => startSelectedVariant("standard"));
 chaosVariantBtn.addEventListener("click", () => startSelectedVariant("chaos"));
+startAiVariantBtn.addEventListener("click", startComputerVariant);
 closeVariantPickerBtn.addEventListener("click", closeVariantPicker);
 backBtn.addEventListener("click", goToMenu);
 newRoundBtn.addEventListener("click", resetBoard);
@@ -78,7 +85,8 @@ playAgainBtn.addEventListener("click", () => {
 function startGame(mode) {
   gameMode = mode;
   boardSize = isChaosMode() ? 4 : 3;
-  winPatterns = buildWinPatterns(boardSize);
+  winPatterns = buildStandardWinPatterns(boardSize);
+  chaosPatterns = isChaosMode() ? buildChaosPatterns(boardSize) : [];
 
   menuScreen.classList.remove("active");
   gameScreen.classList.add("active");
@@ -89,11 +97,19 @@ function startGame(mode) {
 
 function openVariantPicker(baseMode) {
   pendingMenuMode = baseMode;
+  pendingVariant = null;
+  variantPickerTitle.textContent = "Выберите вариант";
+  pickerDifficultyPanel.classList.add("hidden");
+  startAiVariantBtn.classList.add("hidden");
   variantPicker.classList.remove("hidden");
 }
 
 function closeVariantPicker() {
   pendingMenuMode = null;
+  pendingVariant = null;
+  variantPickerTitle.textContent = "Выберите вариант";
+  pickerDifficultyPanel.classList.add("hidden");
+  startAiVariantBtn.classList.add("hidden");
   variantPicker.classList.add("hidden");
 }
 
@@ -104,10 +120,22 @@ function startSelectedVariant(variant) {
 
   if (pendingMenuMode === "pvp") {
     startGame(variant === "chaos" ? "chaos" : "pvp");
-  } else {
-    startGame(variant === "chaos" ? "chaos-ai" : "ai");
+    closeVariantPicker();
+    return;
   }
 
+  pendingVariant = variant;
+  variantPickerTitle.textContent = "Выберите вариант и сложность";
+  pickerDifficultyPanel.classList.remove("hidden");
+  startAiVariantBtn.classList.remove("hidden");
+}
+
+function startComputerVariant() {
+  if (pendingMenuMode !== "ai" || !pendingVariant) {
+    return;
+  }
+
+  startGame(pendingVariant === "chaos" ? "chaos-ai" : "ai");
   closeVariantPicker();
 }
 
@@ -118,6 +146,7 @@ function goToMenu() {
   menuScreen.classList.add("active");
   closeVariantPicker();
   hideModal();
+  hideResultBanner();
 }
 
 function resetBoard() {
@@ -129,6 +158,7 @@ function resetBoard() {
 
   createBoardCells();
   hideModal();
+  hideResultBanner();
   updateStatus();
   updateBoardState();
 }
@@ -336,7 +366,7 @@ function finishGameWithWinner(winnerData) {
     }
   }
 
-  showModal("Победа!", resultMessage);
+  showResultBanner(resultMessage);
 }
 
 function finishGameWithDraw() {
@@ -353,7 +383,7 @@ function finishGameWithDraw() {
     ? "Свободных клеток больше не осталось"
     : "Никто не победил в этом раунде";
 
-  showModal("Ничья", text);
+  showResultBanner(text);
 }
 
 function highlightWinner(pattern) {
@@ -512,9 +542,10 @@ function aiMove() {
   }
 
   const move = getAiMove();
+  const safeMove = board[move] === "" ? move : getRandomMove();
 
   aiThinking = false;
-  makeMove(move, "O");
+  makeMove(safeMove, "O");
 
   const winnerData = getWinner();
   if (winnerData) {
@@ -768,7 +799,7 @@ function minimax(nextBoard, player, depth) {
   return pickRandom(bestMoves);
 }
 
-function buildWinPatterns(size) {
+function buildStandardWinPatterns(size) {
   const patterns = [];
 
   for (let row = 0; row < size; row += 1) {
@@ -787,6 +818,45 @@ function buildWinPatterns(size) {
     patterns.push(pattern);
   }
 
+  const mainDiagonal = [];
+  const antiDiagonal = [];
+
+  for (let index = 0; index < size; index += 1) {
+    mainDiagonal.push(index * size + index);
+    antiDiagonal.push(index * size + (size - 1 - index));
+  }
+
+  patterns.push(mainDiagonal, antiDiagonal);
+
+  return patterns;
+}
+
+function buildChaosPatterns(size) {
+  const patterns = [];
+
+  for (let row = 0; row < size; row += 1) {
+    const cells = [];
+    for (let col = 0; col < size; col += 1) {
+      cells.push(row * size + col);
+    }
+    patterns.push({ cells, minLength: 2 });
+  }
+
+  for (let col = 0; col < size; col += 1) {
+    const cells = [];
+    for (let row = 0; row < size; row += 1) {
+      cells.push(row * size + col);
+    }
+    patterns.push({ cells, minLength: 2 });
+  }
+
+  patterns.push(...buildDiagonalPatterns(size, 3));
+  return patterns;
+}
+
+function buildDiagonalPatterns(size, minLength) {
+  const patterns = [];
+
   for (let startCol = 0; startCol < size; startCol += 1) {
     const diagonal = [];
     let row = 0;
@@ -798,8 +868,8 @@ function buildWinPatterns(size) {
       col += 1;
     }
 
-    if (diagonal.length >= 3) {
-      patterns.push(diagonal);
+    if (diagonal.length >= minLength) {
+      patterns.push({ cells: diagonal, minLength });
     }
   }
 
@@ -814,8 +884,8 @@ function buildWinPatterns(size) {
       col += 1;
     }
 
-    if (diagonal.length >= 3) {
-      patterns.push(diagonal);
+    if (diagonal.length >= minLength) {
+      patterns.push({ cells: diagonal, minLength });
     }
   }
 
@@ -830,8 +900,8 @@ function buildWinPatterns(size) {
       col -= 1;
     }
 
-    if (diagonal.length >= 3) {
-      patterns.push(diagonal);
+    if (diagonal.length >= minLength) {
+      patterns.push({ cells: diagonal, minLength });
     }
   }
 
@@ -846,8 +916,8 @@ function buildWinPatterns(size) {
       col -= 1;
     }
 
-    if (diagonal.length >= 3) {
-      patterns.push(diagonal);
+    if (diagonal.length >= minLength) {
+      patterns.push({ cells: diagonal, minLength });
     }
   }
 
@@ -855,12 +925,12 @@ function buildWinPatterns(size) {
 }
 
 function getChaosWinnerForBoard(nextBoard) {
-  for (const pattern of winPatterns) {
-    const compressedEntries = pattern
+  for (const pattern of chaosPatterns) {
+    const compressedEntries = pattern.cells
       .map((index) => ({ index, value: nextBoard[index] }))
       .filter((entry) => entry.value !== "blocked");
 
-    const winner = getWinningStreakFromCompressedLine(compressedEntries);
+    const winner = getWinningStreakFromCompressedLine(compressedEntries, pattern.minLength);
     if (winner) {
       return winner;
     }
@@ -869,8 +939,8 @@ function getChaosWinnerForBoard(nextBoard) {
   return null;
 }
 
-function getWinningStreakFromCompressedLine(compressedEntries) {
-  if (compressedEntries.length < 2) {
+function getWinningStreakFromCompressedLine(compressedEntries, minLength) {
+  if (compressedEntries.length < minLength) {
     return null;
   }
 
@@ -964,12 +1034,12 @@ function evaluateChaosMove(index, player) {
   const opponent = player === "X" ? "O" : "X";
   let score = 0;
 
-  for (const pattern of winPatterns) {
-    if (!pattern.includes(index)) {
+  for (const pattern of chaosPatterns) {
+    if (!pattern.cells.includes(index)) {
       continue;
     }
 
-    const compressedLine = pattern
+    const compressedLine = pattern.cells
       .map((cellIndex) => nextBoard[cellIndex])
       .filter((value) => value !== "blocked");
 
@@ -1046,6 +1116,16 @@ function showModal(title, text) {
 function hideModal() {
   resultModal.classList.add("hidden");
   resultModal.setAttribute("aria-hidden", "true");
+}
+
+function showResultBanner(text) {
+  resultBanner.textContent = text;
+  resultBanner.classList.remove("hidden");
+}
+
+function hideResultBanner() {
+  resultBanner.textContent = "";
+  resultBanner.classList.add("hidden");
 }
 
 function playSound(type) {

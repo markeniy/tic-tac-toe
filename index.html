@@ -12,7 +12,7 @@
       <div id="menuScreen" class="screen active">
         <div class="header-row">
           <div>
-            <p class="eyebrow">VIP Edition</p>
+            <p class="eyebrow">markeniy Edition</p>
             <h1>Крестики-нолики</h1>
           </div>
           <button id="themeToggleBtn" class="icon-btn" type="button" aria-label="Переключить тему">Тема</button>
@@ -26,26 +26,26 @@
           <div class="hero-chip">Режим 4x4</div>
         </div>
 
-        <div class="difficulty-panel" aria-label="Выбор сложности бота">
-          <p class="difficulty-title">Сложность бота</p>
-          <div class="difficulty-buttons">
-            <button id="easyDifficultyBtn" class="difficulty-btn active" type="button">Лёгкий</button>
-            <button id="mediumDifficultyBtn" class="difficulty-btn" type="button">Средний</button>
-            <button id="hardDifficultyBtn" class="difficulty-btn" type="button">Сложный</button>
-          </div>
-        </div>
-
         <div class="menu-buttons">
           <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
           <button id="aiModeBtn" type="button">Играть против компьютера</button>
         </div>
 
         <div id="variantPicker" class="variant-picker hidden" aria-label="Выбор варианта игры">
-          <p class="difficulty-title">Выберите вариант</p>
+          <p id="variantPickerTitle" class="difficulty-title">Выберите вариант</p>
           <div class="variant-buttons">
             <button id="standardVariantBtn" type="button">3x3 стандарт</button>
             <button id="chaosVariantBtn" class="secondary-btn" type="button">4x4 хаос</button>
           </div>
+          <div id="pickerDifficultyPanel" class="difficulty-panel hidden" aria-label="Выбор сложности бота">
+            <p class="difficulty-title">Сложность бота</p>
+            <div class="difficulty-buttons">
+              <button id="easyDifficultyBtn" class="difficulty-btn active" type="button">Лёгкий</button>
+              <button id="mediumDifficultyBtn" class="difficulty-btn" type="button">Средний</button>
+              <button id="hardDifficultyBtn" class="difficulty-btn" type="button">Сложный</button>
+            </div>
+          </div>
+          <button id="startAiVariantBtn" class="hidden" type="button">Начать игру с ботом</button>
           <button id="closeVariantPickerBtn" class="ghost-btn" type="button">Отмена</button>
         </div>
       </div>
@@ -62,12 +62,13 @@
 
         <div class="header-row">
           <div>
-            <p class="eyebrow">VIP Edition</p>
+            <p class="eyebrow">markeniy Edition</p>
             <h1>Крестики-нолики</h1>
           </div>
           <button id="themeToggleBtnGame" class="icon-btn" type="button" aria-label="Переключить тему">Тема</button>
         </div>
         <p id="status" class="status">Ход: X</p>
+        <div id="resultBanner" class="result-banner hidden"></div>
 
         <section class="scoreboard" aria-label="Счёт">
           <div class="score-box x-box">
@@ -105,4 +106,3 @@
   <script src="script.js"></script>
 </body>
 </html>
- 
