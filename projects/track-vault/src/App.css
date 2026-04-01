@@ -1,0 +1,187 @@
+.app-shell {
+  min-height: 100vh;
+  padding: 48px 20px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.app-card {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px;
+  background-color: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 2rem;
+  color: #0f172a;
+}
+
+.add-track-button {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-track-button:hover {
+  background-color: #1d4ed8;
+}
+
+.status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.track-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px solid #dbe4f0;
+  border-radius: 20px;
+  background-color: #f8fafc;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.save-track-button {
+  align-self: end;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  background-color: #0f172a;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-track-button:hover {
+  background-color: #1e293b;
+}
+
+.filter-button {
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background-color: #ffffff;
+  color: #334155;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.filter-button.active {
+  background-color: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.track-list {
+  min-height: 240px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 20px;
+  background-color: #f8fafc;
+  padding: 20px;
+}
+
+.track-items {
+  display: grid;
+  gap: 16px;
+}
+
+.track-item {
+  padding: 18px;
+  border: 1px solid #dbe4f0;
+  border-radius: 16px;
+  background-color: #ffffff;
+}
+
+.track-item-title {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.track-item-text {
+  color: #475569;
+}
+
+.track-item-text + .track-item-text {
+  margin-top: 6px;
+}
+
+.empty-state {
+  margin: 0;
+  font-size: 1rem;
+  color: #64748b;
+  min-height: 198px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 24px 16px;
+  }
+
+  .app-card {
+    padding: 24px;
+  }
+
+  .app-topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .track-form {
+    grid-template-columns: 1fr;
+  }
+
+  .add-track-button {
+    width: 100%;
+  }
+
+  .save-track-button {
+    width: 100%;
+  }
+}
