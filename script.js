@@ -14,6 +14,8 @@ const pickerDifficultyPanel = document.getElementById("pickerDifficultyPanel");
 const startAiVariantBtn = document.getElementById("startAiVariantBtn");
 const closeVariantPickerBtn = document.getElementById("closeVariantPickerBtn");
 const onlinePanel = document.getElementById("onlinePanel");
+const onlineStandardVariantBtn = document.getElementById("onlineStandardVariantBtn");
+const onlineChaosVariantBtn = document.getElementById("onlineChaosVariantBtn");
 const createRoomBtn = document.getElementById("createRoomBtn");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
@@ -79,6 +81,7 @@ let onlineRoomCode = "";
 let onlinePlayerSymbol = "";
 let onlineState = null;
 let onlineResultSignature = "";
+let onlineVariant = "standard";
 
 let scoreX = 0;
 let scoreO = 0;
@@ -90,6 +93,7 @@ applyTheme();
 updateSoundButton();
 applyDifficulty();
 updateOnlineSetupHint();
+applyOnlineVariantButtons();
 
 twoPlayersBtn.addEventListener("click", () => openVariantPicker("pvp"));
 aiModeBtn.addEventListener("click", () => openVariantPicker("ai"));
@@ -101,6 +105,8 @@ closeVariantPickerBtn.addEventListener("click", closeVariantPicker);
 createRoomBtn.addEventListener("click", createOnlineRoom);
 joinRoomBtn.addEventListener("click", joinOnlineRoom);
 closeOnlinePanelBtn.addEventListener("click", closeOnlinePanel);
+onlineStandardVariantBtn.addEventListener("click", () => setOnlineVariant("standard"));
+onlineChaosVariantBtn.addEventListener("click", () => setOnlineVariant("chaos"));
 roomCodeInput.addEventListener("input", () => {
   roomCodeInput.value = normalizeRoomCode(roomCodeInput.value);
 });
@@ -166,6 +172,7 @@ function openOnlinePanel() {
   closeVariantPicker();
   clearOnlinePanelMessage();
   roomCodeInput.value = "";
+  applyOnlineVariantButtons();
   onlinePanel.classList.remove("hidden");
 }
 
@@ -206,18 +213,19 @@ async function createOnlineRoom() {
   }
 
   setOnlinePanelMessage("Создаю комнату...");
+  const selectedBoardSize = onlineVariant === "chaos" ? 4 : 3;
 
   const roomCode = generateRoomCode();
   const { data, error } = await supabase
     .from("online_rooms")
     .insert({
       room_code: roomCode,
-      board: createEmptyBoard(3),
+      board: createEmptyBoard(selectedBoardSize),
       current_player: "X",
       status: "waiting",
       winner: null,
       winning_pattern: [],
-      board_size: 3
+      board_size: selectedBoardSize
     })
     .select()
     .single();
@@ -299,11 +307,12 @@ async function startOnlineSession(room, playerSymbol) {
   onlineRoomCode = room.room_code;
   onlinePlayerSymbol = playerSymbol;
   onlineState = room;
+  onlineVariant = room.board_size === 4 ? "chaos" : "standard";
 
-  gameMode = "online";
-  boardSize = 3;
+  gameMode = getOnlineGameMode(room);
+  boardSize = room.board_size || 3;
   winPatterns = buildStandardWinPatterns(boardSize);
-  chaosPatterns = [];
+  chaosPatterns = isChaosMode() ? buildChaosPatterns(boardSize) : [];
 
   menuScreen.classList.remove("active");
   gameScreen.classList.add("active");
@@ -503,18 +512,30 @@ async function handleOnlineMove(index) {
   boardLocked = true;
   updateBoardState();
 
-  const nextBoard = board.slice();
+  let nextBoard = board.slice();
   nextBoard[index] = onlinePlayerSymbol;
-  const winnerData = getWinnerForBoard(nextBoard);
-  const draw = !winnerData && isDrawForBoard(nextBoard);
+  let winnerData = getWinnerForBoard(nextBoard);
+  let draw = !winnerData && isDrawForBoard(nextBoard);
+  const nextPlayer = onlinePlayerSymbol === "X" ? "O" : "X";
 
   const patch = {
     board: nextBoard,
-    current_player: onlinePlayerSymbol === "X" ? "O" : "X",
+    current_player: nextPlayer,
     winner: null,
     winning_pattern: [],
     status: "playing"
   };
+
+  if (!winnerData && !draw && isChaosMode()) {
+    const removedIndex = pickRandom(getRemovableEmptyCellsForBoard(nextBoard, boardSize));
+    if (typeof removedIndex === "number") {
+      nextBoard = nextBoard.slice();
+      nextBoard[removedIndex] = "blocked";
+      patch.board = nextBoard;
+      winnerData = getWinnerForBoard(nextBoard);
+      draw = !winnerData && isDrawForBoard(nextBoard);
+    }
+  }
 
   if (winnerData) {
     patch.winner = winnerData.player;
@@ -696,7 +717,12 @@ function finishGameWithDraw() {
 
 function applyOnlineState(room) {
   onlineState = room;
-  board = Array.isArray(room.board) ? room.board : createEmptyBoard(3);
+  onlineVariant = room.board_size === 4 ? "chaos" : "standard";
+  gameMode = getOnlineGameMode(room);
+  boardSize = room.board_size || 3;
+  winPatterns = buildStandardWinPatterns(boardSize);
+  chaosPatterns = isChaosMode() ? buildChaosPatterns(boardSize) : [];
+  board = Array.isArray(room.board) ? room.board : createEmptyBoard(boardSize);
   currentPlayer = room.current_player || "X";
   gameActive = room.status === "playing";
   aiThinking = false;
@@ -820,6 +846,11 @@ function updateModeLabel() {
     return;
   }
 
+  if (gameMode === "online-chaos") {
+    modeLabel.textContent = "Режим: онлайн 4x4 хаос";
+    return;
+  }
+
   if (gameMode === "ai") {
     modeLabel.textContent = "Режим: против компьютера";
     return;
@@ -912,7 +943,9 @@ function applyDifficulty() {
 
 function updateDifficultyBadge() {
   if (isOnlineMode()) {
-    difficultyBadge.textContent = `Ты: ${onlinePlayerSymbol || "?"}`;
+    difficultyBadge.textContent = onlineVariant === "chaos"
+      ? `Ты: ${onlinePlayerSymbol || "?"} · 4x4`
+      : `Ты: ${onlinePlayerSymbol || "?"}`;
     return;
   }
 
@@ -953,7 +986,9 @@ function updateOnlineRoomPanel() {
   }
 
   roomCodeBadge.textContent = `Комната: ${onlineRoomCode}`;
-  playerBadge.textContent = `Ты играешь за: ${onlinePlayerSymbol}`;
+  playerBadge.textContent = onlineVariant === "chaos"
+    ? `Ты играешь за: ${onlinePlayerSymbol} · 4x4 хаос`
+    : `Ты играешь за: ${onlinePlayerSymbol} · 3x3`;
   shareLinkInput.value = `${window.location.origin}${window.location.pathname}?room=${onlineRoomCode}`;
 }
 
@@ -1423,23 +1458,7 @@ function getWinningStreakFromCompressedLine(compressedEntries, minLength) {
 }
 
 function getEdgeEmptyCells() {
-  const edgeCells = [];
-
-  for (let index = 0; index < board.length; index += 1) {
-    if (board[index] !== "") {
-      continue;
-    }
-
-    const row = Math.floor(index / boardSize);
-    const col = index % boardSize;
-    const isEdge = row === 0 || row === boardSize - 1 || col === 0 || col === boardSize - 1;
-
-    if (isEdge) {
-      edgeCells.push(index);
-    }
-  }
-
-  return edgeCells;
+  return getEdgeEmptyCellsForBoard(board, boardSize);
 }
 
 function getChaosWinningMove(player) {
@@ -1521,7 +1540,7 @@ function getEmptyCells() {
 }
 
 function isChaosMode() {
-  return gameMode === "chaos" || gameMode === "chaos-ai";
+  return gameMode === "chaos" || gameMode === "chaos-ai" || gameMode === "online-chaos";
 }
 
 function isComputerMode() {
@@ -1689,7 +1708,7 @@ async function resetOnlineRoom() {
   const { data, error } = await supabase
     .from("online_rooms")
     .update({
-      board: createEmptyBoard(3),
+      board: createEmptyBoard(onlineState.board_size || boardSize || 3),
       current_player: "X",
       status: "playing",
       winner: null,
@@ -1746,6 +1765,49 @@ function createEmptyBoard(size) {
   return Array(size * size).fill("");
 }
 
+function getOnlineGameMode(room) {
+  return room.board_size === 4 ? "online-chaos" : "online";
+}
+
+function setOnlineVariant(variant) {
+  onlineVariant = variant === "chaos" ? "chaos" : "standard";
+  applyOnlineVariantButtons();
+}
+
+function applyOnlineVariantButtons() {
+  onlineStandardVariantBtn.classList.toggle("secondary-btn", onlineVariant !== "standard");
+  onlineChaosVariantBtn.classList.toggle("secondary-btn", onlineVariant !== "chaos");
+}
+
+function getEdgeEmptyCellsForBoard(nextBoard, size) {
+  const edgeCells = [];
+
+  for (let index = 0; index < nextBoard.length; index += 1) {
+    if (nextBoard[index] !== "") {
+      continue;
+    }
+
+    const row = Math.floor(index / size);
+    const col = index % size;
+    const isEdge = row === 0 || row === size - 1 || col === 0 || col === size - 1;
+
+    if (isEdge) {
+      edgeCells.push(index);
+    }
+  }
+
+  return edgeCells;
+}
+
+function getRemovableEmptyCellsForBoard(nextBoard, size) {
+  const edgeCells = getEdgeEmptyCellsForBoard(nextBoard, size);
+  const emptyCells = nextBoard
+    .map((value, index) => (value === "" ? index : null))
+    .filter((index) => index !== null);
+
+  return edgeCells.length > 0 ? edgeCells : emptyCells;
+}
+
 function persistOnlineRole(roomCode, role) {
   const stored = JSON.parse(localStorage.getItem(ONLINE_STORAGE_KEY) || "{}");
   stored[roomCode] = role;
@@ -1758,5 +1820,5 @@ function getSavedOnlineRole(roomCode) {
 }
 
 function isOnlineMode() {
-  return gameMode === "online";
+  return gameMode === "online" || gameMode === "online-chaos";
 }
