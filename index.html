@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Крестики-нолики</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="card">
+      <div id="menuScreen" class="screen active">
+        <div class="header-row">
+          <div>
+            <p class="eyebrow">markeniy Edition</p>
+            <h1>Крестики-нолики</h1>
+          </div>
+          <button id="themeToggleBtn" class="icon-btn" type="button" aria-label="Переключить тему">Тема</button>
+        </div>
+        <p class="subtitle">Выберите режим и начните игру в премиальном стиле.</p>
+
+        <div class="hero-panel">
+          <div class="hero-chip">Живой звук</div>
+          <div class="hero-chip">Счёт сохраняется</div>
+          <div class="hero-chip">Игра с ИИ</div>
+          <div class="hero-chip">Режим 4x4</div>
+        </div>
+
+        <div class="menu-buttons">
+          <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
+          <button id="aiModeBtn" type="button">Играть против компьютера</button>
+        </div>
+
+        <div id="variantPicker" class="variant-picker hidden" aria-label="Выбор варианта игры">
+          <p id="variantPickerTitle" class="difficulty-title">Выберите вариант</p>
+          <div class="variant-buttons">
+            <button id="standardVariantBtn" type="button">3x3 стандарт</button>
+            <button id="chaosVariantBtn" class="secondary-btn" type="button">4x4 хаос</button>
+          </div>
+          <div id="pickerDifficultyPanel" class="difficulty-panel hidden" aria-label="Выбор сложности бота">
+            <p class="difficulty-title">Сложность бота</p>
+            <div class="difficulty-buttons">
+              <button id="easyDifficultyBtn" class="difficulty-btn active" type="button">Лёгкий</button>
+              <button id="mediumDifficultyBtn" class="difficulty-btn" type="button">Средний</button>
+              <button id="hardDifficultyBtn" class="difficulty-btn" type="button">Сложный</button>
+            </div>
+          </div>
+          <button id="startAiVariantBtn" class="hidden" type="button">Начать игру с ботом</button>
+          <button id="closeVariantPickerBtn" class="ghost-btn" type="button">Отмена</button>
+        </div>
+      </div>
+
+      <div id="gameScreen" class="screen">
+        <div class="top-bar">
+          <button id="backBtn" class="secondary-btn" type="button">Назад</button>
+          <div class="top-actions">
+            <button id="soundToggleBtn" class="icon-btn" type="button">Звук: вкл</button>
+            <div id="difficultyBadge" class="mode-label"></div>
+            <div id="modeLabel" class="mode-label"></div>
+          </div>
+        </div>
+
+        <div class="header-row">
+          <div>
+            <p class="eyebrow">markeniy Edition</p>
+            <h1>Крестики-нолики</h1>
+          </div>
+          <button id="themeToggleBtnGame" class="icon-btn" type="button" aria-label="Переключить тему">Тема</button>
+        </div>
+        <p id="status" class="status">Ход: X</p>
+        <div id="resultBanner" class="result-banner hidden"></div>
+
+        <section class="scoreboard" aria-label="Счёт">
+          <div class="score-box x-box">
+            <span>Крестики</span>
+            <strong id="scoreX">0</strong>
+          </div>
+          <div class="score-box o-box">
+            <span>Нолики</span>
+            <strong id="scoreO">0</strong>
+          </div>
+          <div class="score-box">
+            <span>Ничьи</span>
+            <strong id="scoreDraw">0</strong>
+          </div>
+        </section>
+
+        <section id="board" class="board" aria-label="Игровое поле"></section>
+
+        <div class="action-buttons">
+          <button id="newRoundBtn" type="button">Новый раунд</button>
+          <button id="resetAllBtn" class="secondary-btn" type="button">Сбросить всё</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="resultModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
+      <h2 id="resultTitle">Победа!</h2>
+      <p id="resultText">Игрок X победил</p>
+      <button id="playAgainBtn" type="button">Играть ещё</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
