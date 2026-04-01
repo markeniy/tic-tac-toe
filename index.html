@@ -23,6 +23,7 @@
           <div class="hero-chip">Живой звук</div>
           <div class="hero-chip">Счёт сохраняется</div>
           <div class="hero-chip">Игра с ИИ</div>
+          <div class="hero-chip">Режим 4x4</div>
         </div>
 
         <div class="difficulty-panel" aria-label="Выбор сложности бота">
@@ -37,6 +38,7 @@
         <div class="menu-buttons">
           <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
           <button id="aiModeBtn" type="button">Играть против компьютера</button>
+          <button id="chaosModeBtn" class="secondary-btn" type="button">4x4 с исчезающими клетками</button>
         </div>
       </div>
 
@@ -74,17 +76,7 @@
           </div>
         </section>
 
-        <section id="board" class="board" aria-label="Игровое поле">
-          <button class="cell" data-index="0" type="button" aria-label="Клетка 1"></button>
-          <button class="cell" data-index="1" type="button" aria-label="Клетка 2"></button>
-          <button class="cell" data-index="2" type="button" aria-label="Клетка 3"></button>
-          <button class="cell" data-index="3" type="button" aria-label="Клетка 4"></button>
-          <button class="cell" data-index="4" type="button" aria-label="Клетка 5"></button>
-          <button class="cell" data-index="5" type="button" aria-label="Клетка 6"></button>
-          <button class="cell" data-index="6" type="button" aria-label="Клетка 7"></button>
-          <button class="cell" data-index="7" type="button" aria-label="Клетка 8"></button>
-          <button class="cell" data-index="8" type="button" aria-label="Клетка 9"></button>
-        </section>
+        <section id="board" class="board" aria-label="Игровое поле"></section>
 
         <div class="action-buttons">
           <button id="newRoundBtn" type="button">Новый раунд</button>

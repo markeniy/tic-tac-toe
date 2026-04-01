@@ -3,6 +3,7 @@ const gameScreen = document.getElementById("gameScreen");
 
 const twoPlayersBtn = document.getElementById("twoPlayersBtn");
 const aiModeBtn = document.getElementById("aiModeBtn");
+const chaosModeBtn = document.getElementById("chaosModeBtn");
 const backBtn = document.getElementById("backBtn");
 const newRoundBtn = document.getElementById("newRoundBtn");
 const resetAllBtn = document.getElementById("resetAllBtn");
@@ -13,6 +14,7 @@ const easyDifficultyBtn = document.getElementById("easyDifficultyBtn");
 const mediumDifficultyBtn = document.getElementById("mediumDifficultyBtn");
 const hardDifficultyBtn = document.getElementById("hardDifficultyBtn");
 
+const boardNode = document.getElementById("board");
 const statusText = document.getElementById("status");
 const modeLabel = document.getElementById("modeLabel");
 const difficultyBadge = document.getElementById("difficultyBadge");
@@ -26,20 +28,10 @@ const resultTitle = document.getElementById("resultTitle");
 const resultText = document.getElementById("resultText");
 const playAgainBtn = document.getElementById("playAgainBtn");
 
-const cells = Array.from(document.querySelectorAll(".cell"));
-
-const winPatterns = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6]
-];
-
-let board = Array(9).fill("");
+let cells = [];
+let winPatterns = [];
+let board = [];
+let boardSize = 3;
 let currentPlayer = "X";
 let gameActive = false;
 let gameMode = "pvp";
@@ -61,6 +53,7 @@ applyDifficulty();
 
 twoPlayersBtn.addEventListener("click", () => startGame("pvp"));
 aiModeBtn.addEventListener("click", () => startGame("ai"));
+chaosModeBtn.addEventListener("click", () => startGame("chaos"));
 backBtn.addEventListener("click", goToMenu);
 newRoundBtn.addEventListener("click", resetBoard);
 resetAllBtn.addEventListener("click", resetAll);
@@ -75,18 +68,14 @@ playAgainBtn.addEventListener("click", () => {
   resetBoard();
 });
 
-cells.forEach((cell) => {
-  cell.addEventListener("click", () => {
-    const index = Number(cell.dataset.index);
-    handleCellClick(index);
-  });
-});
-
 function startGame(mode) {
   gameMode = mode;
+  boardSize = gameMode === "chaos" ? 4 : 3;
+  winPatterns = buildWinPatterns(boardSize);
+
   menuScreen.classList.remove("active");
   gameScreen.classList.add("active");
-  modeLabel.textContent = mode === "ai" ? "Режим: против компьютера" : "Режим: вдвоём";
+  updateModeLabel();
   updateDifficultyBadge();
   resetBoard();
 }
@@ -97,6 +86,46 @@ function goToMenu() {
   gameScreen.classList.remove("active");
   menuScreen.classList.add("active");
   hideModal();
+}
+
+function resetBoard() {
+  board = Array(boardSize * boardSize).fill("");
+  currentPlayer = "X";
+  gameActive = true;
+  aiThinking = false;
+
+  createBoardCells();
+  hideModal();
+  updateStatus();
+  updateBoardState();
+}
+
+function resetAll() {
+  resetBoard();
+  scoreX = 0;
+  scoreO = 0;
+  scoreDraw = 0;
+  updateScoreUI();
+  saveScores();
+}
+
+function createBoardCells() {
+  boardNode.innerHTML = "";
+  boardNode.style.setProperty("--board-size", String(boardSize));
+  cells = [];
+
+  for (let index = 0; index < board.length; index += 1) {
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "cell";
+    cell.dataset.index = String(index);
+    cell.setAttribute("aria-label", `Клетка ${index + 1}`);
+    cell.addEventListener("click", () => handleCellClick(index));
+    boardNode.appendChild(cell);
+    cells.push(cell);
+  }
+
+  renderBoard();
 }
 
 function handleCellClick(index) {
@@ -117,6 +146,21 @@ function handleCellClick(index) {
     return;
   }
 
+  if (gameMode === "chaos") {
+    removeRandomEmptyCell();
+
+    const chaosWinner = getWinner();
+    if (chaosWinner) {
+      finishGameWithWinner(chaosWinner);
+      return;
+    }
+
+    if (isDraw()) {
+      finishGameWithDraw();
+      return;
+    }
+  }
+
   switchPlayer();
 
   if (gameMode === "ai" && currentPlayer === "O" && gameActive) {
@@ -132,11 +176,26 @@ function makeMove(index, player) {
   const cell = cells[index];
 
   cell.textContent = player;
-  cell.classList.remove("pop", "x", "o");
+  cell.classList.remove("pop", "x", "o", "blocked");
   cell.classList.add("pop", player.toLowerCase());
   playSound(player === "X" ? "moveX" : "moveO");
 
   updateBoardState();
+}
+
+function removeRandomEmptyCell() {
+  const emptyCells = board
+    .map((value, index) => (value === "" ? index : null))
+    .filter((index) => index !== null);
+
+  if (emptyCells.length === 0) {
+    return;
+  }
+
+  const removedIndex = pickRandom(emptyCells);
+  board[removedIndex] = "blocked";
+  playSound("block");
+  renderBoard();
 }
 
 function switchPlayer() {
@@ -145,13 +204,47 @@ function switchPlayer() {
   updateBoardState();
 }
 
-function getWinner() {
-  for (const pattern of winPatterns) {
-    const [a, b, c] = pattern;
+function renderBoard() {
+  cells.forEach((cell, index) => {
+    const value = board[index];
+    cell.textContent = value === "blocked" ? "" : value;
+    cell.classList.remove("x", "o", "blocked");
 
-    if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+    if (value === "X") {
+      cell.classList.add("x");
+    } else if (value === "O") {
+      cell.classList.add("o");
+    } else if (value === "blocked") {
+      cell.classList.add("blocked");
+    }
+  });
+
+  updateBoardState();
+}
+
+function updateBoardState() {
+  cells.forEach((cell, index) => {
+    const blockedForAiTurn = gameMode === "ai" && currentPlayer === "O";
+    cell.disabled = !gameActive || aiThinking || blockedForAiTurn || board[index] !== "";
+  });
+}
+
+function getWinner() {
+  return getWinnerForBoard(board);
+}
+
+function getWinnerForBoard(nextBoard) {
+  for (const pattern of winPatterns) {
+    const [first, ...rest] = pattern;
+    const firstValue = nextBoard[first];
+
+    if (!firstValue || firstValue === "blocked") {
+      continue;
+    }
+
+    if (rest.every((index) => nextBoard[index] === firstValue)) {
       return {
-        player: board[a],
+        player: firstValue,
         pattern
       };
     }
@@ -161,7 +254,11 @@ function getWinner() {
 }
 
 function isDraw() {
-  return board.every((cell) => cell !== "");
+  return board.every((cell) => cell !== "") && !getWinner();
+}
+
+function isDrawForBoard(nextBoard) {
+  return nextBoard.every((cell) => cell !== "") && !getWinnerForBoard(nextBoard);
 }
 
 function finishGameWithWinner(winnerData) {
@@ -181,11 +278,15 @@ function finishGameWithWinner(winnerData) {
   updateBoardState();
   saveScores();
 
-  const resultTextValue = gameMode === "ai" && winnerData.player === "O"
-    ? "Компьютер победил"
-    : `Игрок ${winnerData.player} победил`;
+  let resultMessage = `Игрок ${winnerData.player} победил`;
+  if (gameMode === "ai" && winnerData.player === "O") {
+    resultMessage = "Компьютер победил";
+  }
+  if (gameMode === "chaos") {
+    resultMessage = `Игрок ${winnerData.player} собрал линию на поле 4x4`;
+  }
 
-  showModal("Победа!", resultTextValue);
+  showModal("Победа!", resultMessage);
 }
 
 function finishGameWithDraw() {
@@ -197,39 +298,18 @@ function finishGameWithDraw() {
   updateScoreUI();
   updateBoardState();
   saveScores();
-  showModal("Ничья", "Никто не победил в этом раунде");
+
+  const text = gameMode === "chaos"
+    ? "Свободных клеток больше не осталось"
+    : "Никто не победил в этом раунде";
+
+  showModal("Ничья", text);
 }
 
 function highlightWinner(pattern) {
   pattern.forEach((index) => {
     cells[index].classList.add("winner");
   });
-}
-
-function resetBoard() {
-  board = Array(9).fill("");
-  currentPlayer = "X";
-  gameActive = true;
-  aiThinking = false;
-
-  cells.forEach((cell) => {
-    cell.textContent = "";
-    cell.classList.remove("winner", "pop", "x", "o");
-    cell.disabled = false;
-  });
-
-  hideModal();
-  updateStatus();
-  updateBoardState();
-}
-
-function resetAll() {
-  resetBoard();
-  scoreX = 0;
-  scoreO = 0;
-  scoreDraw = 0;
-  updateScoreUI();
-  saveScores();
 }
 
 function updateScoreUI() {
@@ -239,7 +319,7 @@ function updateScoreUI() {
 }
 
 function updateStatus() {
-  if (aiThinking)  {
+  if (aiThinking) {
     statusText.textContent = "Ход компьютера: O";
     return;
   }
@@ -249,14 +329,26 @@ function updateStatus() {
     return;
   }
 
+  if (gameMode === "chaos") {
+    statusText.textContent = `Ход ${currentPlayer}. После хода исчезнет пустая клетка`;
+    return;
+  }
+
   statusText.textContent = `Ход: ${currentPlayer}`;
 }
 
-function updateBoardState() {
-  cells.forEach((cell, index) => {
-    const blockedForAiTurn = gameMode === "ai" && currentPlayer === "O";
-    cell.disabled = !gameActive || aiThinking || blockedForAiTurn || board[index] !== "";
-  });
+function updateModeLabel() {
+  if (gameMode === "ai") {
+    modeLabel.textContent = "Режим: против компьютера";
+    return;
+  }
+
+  if (gameMode === "chaos") {
+    modeLabel.textContent = "Режим: 4x4 исчезающие клетки";
+    return;
+  }
+
+  modeLabel.textContent = "Режим: вдвоём";
 }
 
 function saveScores() {
@@ -268,6 +360,24 @@ function saveScores() {
       scoreDraw
     })
   );
+}
+
+function loadScores() {
+  const saved = localStorage.getItem("ticTacToeScores");
+  if (!saved) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    scoreX = parsed.scoreX || 0;
+    scoreO = parsed.scoreO || 0;
+    scoreDraw = parsed.scoreDraw || 0;
+  } catch (error) {
+    scoreX = 0;
+    scoreO = 0;
+    scoreDraw = 0;
+  }
 }
 
 function toggleTheme() {
@@ -314,8 +424,17 @@ function applyDifficulty() {
 }
 
 function updateDifficultyBadge() {
-  const label = getDifficultyLabel();
-  difficultyBadge.textContent = gameMode === "ai" ? `Бот: ${label}` : `Сложность ИИ: ${label}`;
+  if (gameMode === "ai") {
+    difficultyBadge.textContent = `Бот: ${getDifficultyLabel()}`;
+    return;
+  }
+
+  if (gameMode === "chaos") {
+    difficultyBadge.textContent = "Особый режим";
+    return;
+  }
+
+  difficultyBadge.textContent = "Локальная игра";
 }
 
 function getDifficultyLabel() {
@@ -328,24 +447,6 @@ function getDifficultyLabel() {
   }
 
   return "средний";
-}
-
-function loadScores() {
-  const saved = localStorage.getItem("ticTacToeScores");
-  if (!saved) {
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(saved);
-    scoreX = parsed.scoreX || 0;
-    scoreO = parsed.scoreO || 0;
-    scoreDraw = parsed.scoreDraw || 0;
-  } catch (error) {
-    scoreX = 0;
-    scoreO = 0;
-    scoreDraw = 0;
-  }
 }
 
 function aiMove() {
@@ -372,24 +473,6 @@ function aiMove() {
   }
 
   switchPlayer();
-}
-
-function findWinningMove(player) {
-  for (const pattern of winPatterns) {
-    const values = pattern.map((index) => board[index]);
-    const playerCount = values.filter((value) => value === player).length;
-    const emptyCount = values.filter((value) => value === "").length;
-
-    if (playerCount === 2 && emptyCount === 1) {
-      for (const index of pattern) {
-        if (board[index] === "") {
-          return index;
-        }
-      }
-    }
-  }
-
-  return -1;
 }
 
 function getAiMove() {
@@ -458,19 +541,43 @@ function getHardMove() {
   return typeof result.index === "number" ? result.index : getRandomMove();
 }
 
+function findWinningMove(player) {
+  for (const pattern of winPatterns) {
+    const values = pattern.map((index) => board[index]);
+    const playerCount = values.filter((value) => value === player).length;
+    const emptyCount = values.filter((value) => value === "").length;
+
+    if (playerCount === boardSize - 1 && emptyCount === 1) {
+      for (const index of pattern) {
+        if (board[index] === "") {
+          return index;
+        }
+      }
+    }
+  }
+
+  return -1;
+}
+
 function getStrategicMoves() {
   const moves = [];
 
-  if (board[4] === "") {
-    moves.push(4);
+  const centerIndex = Math.floor(board.length / 2);
+  if (board[centerIndex] === "") {
+    moves.push(centerIndex);
   }
 
-  const corners = [0, 2, 6, 8].filter((index) => board[index] === "");
+  const corners = [0, boardSize - 1, board.length - boardSize, board.length - 1]
+    .filter((index, position, array) => array.indexOf(index) === position)
+    .filter((index) => board[index] === "");
+
   moves.push(...corners);
 
-  const sides = [1, 3, 5, 7].filter((index) => board[index] === "");
-  moves.push(...sides);
+  const sides = board
+    .map((value, index) => (value === "" ? index : null))
+    .filter((index) => index !== null && !moves.includes(index));
 
+  moves.push(...sides);
   return moves;
 }
 
@@ -483,13 +590,13 @@ function getRandomMove() {
 }
 
 function minimax(nextBoard, player, depth) {
-  const winner = getWinnerForBoard(nextBoard);
+  const winnerData = getWinnerForBoard(nextBoard);
 
-  if (winner === "O") {
+  if (winnerData?.player === "O") {
     return { score: 10 - depth };
   }
 
-  if (winner === "X") {
+  if (winnerData?.player === "X") {
     return { score: depth - 10 };
   }
 
@@ -548,18 +655,35 @@ function minimax(nextBoard, player, depth) {
   return pickRandom(bestMoves);
 }
 
-function getWinnerForBoard(nextBoard) {
-  for (const [a, b, c] of winPatterns) {
-    if (nextBoard[a] && nextBoard[a] === nextBoard[b] && nextBoard[b] === nextBoard[c]) {
-      return nextBoard[a];
+function buildWinPatterns(size) {
+  const patterns = [];
+
+  for (let row = 0; row < size; row += 1) {
+    const pattern = [];
+    for (let col = 0; col < size; col += 1) {
+      pattern.push(row * size + col);
     }
+    patterns.push(pattern);
   }
 
-  return null;
-}
+  for (let col = 0; col < size; col += 1) {
+    const pattern = [];
+    for (let row = 0; row < size; row += 1) {
+      pattern.push(row * size + col);
+    }
+    patterns.push(pattern);
+  }
 
-function isDrawForBoard(nextBoard) {
-  return nextBoard.every((cell) => cell !== "") && !getWinnerForBoard(nextBoard);
+  const leftDiagonal = [];
+  const rightDiagonal = [];
+
+  for (let index = 0; index < size; index += 1) {
+    leftDiagonal.push(index * size + index);
+    rightDiagonal.push(index * size + (size - 1 - index));
+  }
+
+  patterns.push(leftDiagonal, rightDiagonal);
+  return patterns;
 }
 
 function pickRandom(items) {
@@ -603,6 +727,12 @@ function playSound(type) {
   if (type === "moveO") {
     tone(context, 261.63, now, 0.09, "sine", 0.05);
     tone(context, 329.63, now + 0.05, 0.11, "sine", 0.03);
+    return;
+  }
+
+  if (type === "block") {
+    tone(context, 196, now, 0.06, "square", 0.04);
+    tone(context, 146.83, now + 0.04, 0.08, "square", 0.03);
     return;
   }
 
