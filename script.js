@@ -870,11 +870,11 @@ function getChaosWinnerForBoard(nextBoard) {
 }
 
 function getWinningStreakFromCompressedLine(compressedEntries) {
-  const requiredLength = compressedEntries.length >= 4 ? 4 : 3;
-
-  if (compressedEntries.length < 3) {
+  if (compressedEntries.length < 2) {
     return null;
   }
+
+  const requiredLength = compressedEntries.length;
 
   let currentPlayer = "";
   let currentPattern = [];
