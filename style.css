@@ -604,9 +604,9 @@ button::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.18) 50%, transparent 80%);
+  background: linear-gradient(120deg, transparent 24%, rgba(255, 255, 255, 0.12) 50%, transparent 76%);
   transform: translateX(-120%);
-  transition: transform 0.7s var(--ease-smooth);
+  transition: transform 1.15s var(--ease-smooth);
   pointer-events: none;
 }
 
