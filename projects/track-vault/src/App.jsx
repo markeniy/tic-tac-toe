@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
+import AuthForm from './components/AuthForm';
 import Header from './components/Header';
 import StatusFilter from './components/StatusFilter';
 import TrackList from './components/TrackList';
@@ -12,6 +13,8 @@ const initialForm = {
 };
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [tracks, setTracks] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -19,10 +22,44 @@ function App() {
   const [editingTrackId, setEditingTrackId] = useState(null);
 
   useEffect(function () {
+    async function loadSession() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('Error loading session:', error);
+        setIsSessionLoading(false);
+        return;
+      }
+
+      setSession(data.session);
+      setIsSessionLoading(false);
+    }
+
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(function (_event, nextSession) {
+      setSession(nextSession);
+      setIsSessionLoading(false);
+    });
+
+    return function () {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(function () {
     async function loadTracks() {
+      if (!session?.user) {
+        setTracks([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('tracks')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -34,12 +71,19 @@ function App() {
     }
 
     loadTracks();
-  }, []);
+  }, [session]);
 
   function handleToggleForm() {
-    setIsFormOpen(function (currentValue) {
-      return !currentValue;
-    });
+    if (isFormOpen) {
+      setIsFormOpen(false);
+      setEditingTrackId(null);
+      setFormData(initialForm);
+      return;
+    }
+
+    setEditingTrackId(null);
+    setFormData(initialForm);
+    setIsFormOpen(true);
   }
 
   function handleChange(event) {
@@ -66,6 +110,10 @@ function App() {
   async function handleSubmit(event) {
     event.preventDefault();
 
+    if (!session?.user) {
+      return;
+    }
+
     if (editingTrackId) {
       const { data, error } = await supabase
         .from('tracks')
@@ -75,6 +123,7 @@ function App() {
           status: formData.status,
         })
         .eq('id', editingTrackId)
+        .eq('user_id', session.user.id)
         .select()
         .single();
 
@@ -93,6 +142,7 @@ function App() {
         title: formData.title,
         bpm: Number(formData.bpm),
         status: formData.status,
+        user_id: session.user.id,
       };
 
       const { data, error } = await supabase
@@ -117,7 +167,15 @@ function App() {
   }
 
   async function handleDelete(id) {
-    const { error } = await supabase.from('tracks').delete().eq('id', id);
+    if (!session?.user) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('tracks')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', session.user.id);
 
     if (error) {
       console.error('Error deleting track:', error);
@@ -131,6 +189,14 @@ function App() {
     });
   }
 
+  async function handleSignOut() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('Error signing out:', error);
+    }
+  }
+
   const filteredTracks =
     activeFilter === 'all'
       ? tracks
@@ -138,15 +204,37 @@ function App() {
           return track.status === activeFilter;
         });
 
+  if (isSessionLoading) {
+    return (
+      <main className="auth-shell">
+        <div className="auth-card">
+          <h1 className="app-title">Track Vault</h1>
+          <p className="auth-text">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return <AuthForm />;
+  }
+
   return (
     <main className="app-shell">
       <div className="app-card">
         <div className="app-topbar">
           <Header />
-          <button type="button" className="add-track-button" onClick={handleToggleForm}>
-            Add Track
-          </button>
+          <div className="topbar-actions">
+            <button type="button" className="add-track-button" onClick={handleToggleForm}>
+              Add Track
+            </button>
+            <button type="button" className="secondary-button" onClick={handleSignOut}>
+              Sign Out
+            </button>
+          </div>
         </div>
+
+        <p className="auth-text">Signed in as {session.user.email}</p>
 
         {isFormOpen ? (
           <form className="track-form" onSubmit={handleSubmit}>
@@ -192,7 +280,7 @@ function App() {
             </div>
 
             <button type="submit" className="save-track-button">
-              Save
+              {editingTrackId ? 'Update' : 'Save'}
             </button>
           </form>
         ) : null}

@@ -4,6 +4,25 @@
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
+.auth-shell {
+  min-height: 100vh;
+  padding: 48px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 32px;
+  background-color: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
 .app-card {
   max-width: 900px;
   margin: 0 auto;
@@ -22,10 +41,20 @@
   margin-bottom: 24px;
 }
 
+.topbar-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .app-title {
   margin: 0;
   font-size: 2rem;
   color: #0f172a;
+}
+
+.auth-text {
+  margin: 0 0 24px;
+  color: #475569;
 }
 
 .add-track-button {
@@ -99,6 +128,34 @@
   background-color: #1e293b;
 }
 
+.secondary-button,
+.edit-track-button,
+.delete-track-button {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background-color: #ffffff;
+  color: #334155;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.secondary-button:hover,
+.edit-track-button:hover,
+.delete-track-button:hover {
+  background-color: #f8fafc;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.auth-submit-button {
+  width: 100%;
+}
+
 .filter-button {
   padding: 10px 16px;
   border: 1px solid #cbd5e1;
@@ -133,6 +190,8 @@
   border: 1px solid #dbe4f0;
   border-radius: 16px;
   background-color: #ffffff;
+  display: grid;
+  gap: 10px;
 }
 
 .track-item-title {
@@ -173,6 +232,10 @@
     align-items: stretch;
   }
 
+  .topbar-actions {
+    flex-direction: column;
+  }
+
   .track-form {
     grid-template-columns: 1fr;
   }
@@ -182,6 +245,10 @@
   }
 
   .save-track-button {
+    width: 100%;
+  }
+
+  .secondary-button {
     width: 100%;
   }
 }
