@@ -38,7 +38,15 @@
         <div class="menu-buttons">
           <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
           <button id="aiModeBtn" type="button">Играть против компьютера</button>
-          <button id="chaosModeBtn" class="secondary-btn" type="button">4x4 с исчезающими клетками</button>
+        </div>
+
+        <div id="variantPicker" class="variant-picker hidden" aria-label="Выбор варианта игры">
+          <p class="difficulty-title">Выберите вариант</p>
+          <div class="variant-buttons">
+            <button id="standardVariantBtn" type="button">3x3 стандарт</button>
+            <button id="chaosVariantBtn" class="secondary-btn" type="button">4x4 хаос</button>
+          </div>
+          <button id="closeVariantPickerBtn" class="ghost-btn" type="button">Отмена</button>
         </div>
       </div>
 

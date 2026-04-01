@@ -3,7 +3,10 @@ const gameScreen = document.getElementById("gameScreen");
 
 const twoPlayersBtn = document.getElementById("twoPlayersBtn");
 const aiModeBtn = document.getElementById("aiModeBtn");
-const chaosModeBtn = document.getElementById("chaosModeBtn");
+const variantPicker = document.getElementById("variantPicker");
+const standardVariantBtn = document.getElementById("standardVariantBtn");
+const chaosVariantBtn = document.getElementById("chaosVariantBtn");
+const closeVariantPickerBtn = document.getElementById("closeVariantPickerBtn");
 const backBtn = document.getElementById("backBtn");
 const newRoundBtn = document.getElementById("newRoundBtn");
 const resetAllBtn = document.getElementById("resetAllBtn");
@@ -36,6 +39,8 @@ let currentPlayer = "X";
 let gameActive = false;
 let gameMode = "pvp";
 let aiThinking = false;
+let pendingMenuMode = null;
+let boardLocked = false;
 let currentTheme = localStorage.getItem("ticTacToeTheme") || "dark";
 let soundEnabled = localStorage.getItem("ticTacToeSound") !== "off";
 let botDifficulty = localStorage.getItem("ticTacToeDifficulty") || "medium";
@@ -51,9 +56,11 @@ applyTheme();
 updateSoundButton();
 applyDifficulty();
 
-twoPlayersBtn.addEventListener("click", () => startGame("pvp"));
-aiModeBtn.addEventListener("click", () => startGame("ai"));
-chaosModeBtn.addEventListener("click", () => startGame("chaos"));
+twoPlayersBtn.addEventListener("click", () => openVariantPicker("pvp"));
+aiModeBtn.addEventListener("click", () => openVariantPicker("ai"));
+standardVariantBtn.addEventListener("click", () => startSelectedVariant("standard"));
+chaosVariantBtn.addEventListener("click", () => startSelectedVariant("chaos"));
+closeVariantPickerBtn.addEventListener("click", closeVariantPicker);
 backBtn.addEventListener("click", goToMenu);
 newRoundBtn.addEventListener("click", resetBoard);
 resetAllBtn.addEventListener("click", resetAll);
@@ -70,7 +77,7 @@ playAgainBtn.addEventListener("click", () => {
 
 function startGame(mode) {
   gameMode = mode;
-  boardSize = gameMode === "chaos" ? 4 : 3;
+  boardSize = isChaosMode() ? 4 : 3;
   winPatterns = buildWinPatterns(boardSize);
 
   menuScreen.classList.remove("active");
@@ -80,11 +87,36 @@ function startGame(mode) {
   resetBoard();
 }
 
+function openVariantPicker(baseMode) {
+  pendingMenuMode = baseMode;
+  variantPicker.classList.remove("hidden");
+}
+
+function closeVariantPicker() {
+  pendingMenuMode = null;
+  variantPicker.classList.add("hidden");
+}
+
+function startSelectedVariant(variant) {
+  if (!pendingMenuMode) {
+    return;
+  }
+
+  if (pendingMenuMode === "pvp") {
+    startGame(variant === "chaos" ? "chaos" : "pvp");
+  } else {
+    startGame(variant === "chaos" ? "chaos-ai" : "ai");
+  }
+
+  closeVariantPicker();
+}
+
 function goToMenu() {
   gameActive = false;
   aiThinking = false;
   gameScreen.classList.remove("active");
   menuScreen.classList.add("active");
+  closeVariantPicker();
   hideModal();
 }
 
@@ -93,6 +125,7 @@ function resetBoard() {
   currentPlayer = "X";
   gameActive = true;
   aiThinking = false;
+  boardLocked = false;
 
   createBoardCells();
   hideModal();
@@ -129,7 +162,7 @@ function createBoardCells() {
 }
 
 function handleCellClick(index) {
-  if (!gameActive || aiThinking || board[index] !== "") {
+  if (!gameActive || aiThinking || boardLocked || board[index] !== "") {
     return;
   }
 
@@ -146,24 +179,34 @@ function handleCellClick(index) {
     return;
   }
 
-  if (gameMode === "chaos") {
-    removeRandomEmptyCell();
+  if (isChaosMode()) {
+    removeRandomEmptyCell(() => {
+      const chaosWinner = getWinner();
+      if (chaosWinner) {
+        finishGameWithWinner(chaosWinner);
+        return;
+      }
 
-    const chaosWinner = getWinner();
-    if (chaosWinner) {
-      finishGameWithWinner(chaosWinner);
-      return;
-    }
+      if (isDraw()) {
+        finishGameWithDraw();
+        return;
+      }
 
-    if (isDraw()) {
-      finishGameWithDraw();
-      return;
-    }
+      switchPlayer();
+
+      if (isComputerMode() && currentPlayer === "O" && gameActive) {
+        aiThinking = true;
+        updateStatus();
+        updateBoardState();
+        window.setTimeout(aiMove, 450);
+      }
+    });
+    return;
   }
 
   switchPlayer();
 
-  if (gameMode === "ai" && currentPlayer === "O" && gameActive) {
+  if (isComputerMode() && currentPlayer === "O" && gameActive) {
     aiThinking = true;
     updateStatus();
     updateBoardState();
@@ -183,7 +226,7 @@ function makeMove(index, player) {
   updateBoardState();
 }
 
-function removeRandomEmptyCell() {
+function removeRandomEmptyCell(onComplete) {
   const edgeEmptyCells = getEdgeEmptyCells();
   const emptyCells = board
     .map((value, index) => (value === "" ? index : null))
@@ -195,9 +238,7 @@ function removeRandomEmptyCell() {
 
   const removableCells = edgeEmptyCells.length > 0 ? edgeEmptyCells : emptyCells;
   const removedIndex = pickRandom(removableCells);
-  board[removedIndex] = "blocked";
-  playSound("block");
-  renderBoard();
+  animateCellRemoval(removedIndex, onComplete);
 }
 
 function switchPlayer() {
@@ -226,8 +267,8 @@ function renderBoard() {
 
 function updateBoardState() {
   cells.forEach((cell, index) => {
-    const blockedForAiTurn = gameMode === "ai" && currentPlayer === "O";
-    cell.disabled = !gameActive || aiThinking || blockedForAiTurn || board[index] !== "";
+    const blockedForAiTurn = isComputerMode() && currentPlayer === "O";
+    cell.disabled = !gameActive || aiThinking || boardLocked || blockedForAiTurn || board[index] !== "";
   });
 }
 
@@ -236,6 +277,10 @@ function getWinner() {
 }
 
 function getWinnerForBoard(nextBoard) {
+  if (isChaosMode()) {
+    return getChaosWinnerForBoard(nextBoard);
+  }
+
   for (const pattern of winPatterns) {
     const [first, ...rest] = pattern;
     const firstValue = nextBoard[first];
@@ -281,11 +326,14 @@ function finishGameWithWinner(winnerData) {
   saveScores();
 
   let resultMessage = `Игрок ${winnerData.player} победил`;
-  if (gameMode === "ai" && winnerData.player === "O") {
+  if (isComputerMode() && winnerData.player === "O") {
     resultMessage = "Компьютер победил";
   }
-  if (gameMode === "chaos") {
+  if (isChaosMode()) {
     resultMessage = `Игрок ${winnerData.player} собрал линию на поле 4x4`;
+    if (isComputerMode() && winnerData.player === "O") {
+      resultMessage = "Компьютер собрал линию на поле 4x4";
+    }
   }
 
   showModal("Победа!", resultMessage);
@@ -301,7 +349,7 @@ function finishGameWithDraw() {
   updateBoardState();
   saveScores();
 
-  const text = gameMode === "chaos"
+  const text = isChaosMode()
     ? "Свободных клеток больше не осталось"
     : "Никто не победил в этом раунде";
 
@@ -326,12 +374,12 @@ function updateStatus() {
     return;
   }
 
-  if (gameMode === "ai") {
+  if (isComputerMode()) {
     statusText.textContent = currentPlayer === "X" ? "Ваш ход: X" : "Ход компьютера: O";
     return;
   }
 
-  if (gameMode === "chaos") {
+  if (isChaosMode()) {
     statusText.textContent = `Ход ${currentPlayer}. После хода исчезнет пустая клетка`;
     return;
   }
@@ -347,6 +395,11 @@ function updateModeLabel() {
 
   if (gameMode === "chaos") {
     modeLabel.textContent = "Режим: 4x4 исчезающие клетки";
+    return;
+  }
+
+  if (gameMode === "chaos-ai") {
+    modeLabel.textContent = "Режим: 4x4 хаос против компьютера";
     return;
   }
 
@@ -426,12 +479,12 @@ function applyDifficulty() {
 }
 
 function updateDifficultyBadge() {
-  if (gameMode === "ai") {
+  if (isComputerMode()) {
     difficultyBadge.textContent = `Бот: ${getDifficultyLabel()}`;
     return;
   }
 
-  if (gameMode === "chaos") {
+  if (isChaosMode()) {
     difficultyBadge.textContent = "Особый режим";
     return;
   }
@@ -474,6 +527,24 @@ function aiMove() {
     return;
   }
 
+  if (isChaosMode()) {
+    removeRandomEmptyCell(() => {
+      const chaosWinner = getWinner();
+      if (chaosWinner) {
+        finishGameWithWinner(chaosWinner);
+        return;
+      }
+
+      if (isDraw()) {
+        finishGameWithDraw();
+        return;
+      }
+
+      switchPlayer();
+    });
+    return;
+  }
+
   switchPlayer();
 }
 
@@ -490,6 +561,10 @@ function getAiMove() {
 }
 
 function getEasyMove() {
+  if (isChaosMode() && Math.random() < 0.25) {
+    return getChaosStrategicMove("O") ?? getRandomMove();
+  }
+
   const randomChance = Math.random();
 
   if (randomChance < 0.7) {
@@ -514,6 +589,25 @@ function getEasyMove() {
 }
 
 function getMediumMove() {
+  if (isChaosMode()) {
+    const chaosWinningMove = getChaosWinningMove("O");
+    if (chaosWinningMove !== -1) {
+      return chaosWinningMove;
+    }
+
+    const chaosBlockMove = getChaosWinningMove("X");
+    if (chaosBlockMove !== -1) {
+      return chaosBlockMove;
+    }
+
+    if (Math.random() < 0.65) {
+      const strategicMove = getChaosStrategicMove("O");
+      if (strategicMove !== null) {
+        return strategicMove;
+      }
+    }
+  }
+
   if (Math.random() < 0.35) {
     return getRandomMove();
   }
@@ -539,6 +633,23 @@ function getMediumMove() {
 }
 
 function getHardMove() {
+  if (isChaosMode()) {
+    const winningMove = getChaosWinningMove("O");
+    if (winningMove !== -1) {
+      return winningMove;
+    }
+
+    const blockMove = getChaosWinningMove("X");
+    if (blockMove !== -1) {
+      return blockMove;
+    }
+
+    const strategicMove = getChaosStrategicMove("O");
+    if (strategicMove !== null) {
+      return strategicMove;
+    }
+  }
+
   const result = minimax(board.slice(), "O", 0);
   return typeof result.index === "number" ? result.index : getRandomMove();
 }
@@ -688,6 +799,56 @@ function buildWinPatterns(size) {
   return patterns;
 }
 
+function getChaosWinnerForBoard(nextBoard) {
+  for (const pattern of winPatterns) {
+    const compressedEntries = pattern
+      .map((index) => ({ index, value: nextBoard[index] }))
+      .filter((entry) => entry.value !== "blocked");
+
+    const winner = getWinningStreakFromCompressedLine(compressedEntries);
+    if (winner) {
+      return winner;
+    }
+  }
+
+  return null;
+}
+
+function getWinningStreakFromCompressedLine(compressedEntries) {
+  const requiredLength = compressedEntries.length >= 4 ? 4 : 3;
+
+  if (compressedEntries.length < 3) {
+    return null;
+  }
+
+  let currentPlayer = "";
+  let currentPattern = [];
+
+  for (const entry of compressedEntries) {
+    if (entry.value === "") {
+      currentPlayer = "";
+      currentPattern = [];
+      continue;
+    }
+
+    if (entry.value === currentPlayer) {
+      currentPattern.push(entry.index);
+    } else {
+      currentPlayer = entry.value;
+      currentPattern = [entry.index];
+    }
+
+    if (currentPattern.length >= requiredLength) {
+      return {
+        player: currentPlayer,
+        pattern: [...currentPattern]
+      };
+    }
+  }
+
+  return null;
+}
+
 function getEdgeEmptyCells() {
   const edgeCells = [];
 
@@ -706,6 +867,114 @@ function getEdgeEmptyCells() {
   }
 
   return edgeCells;
+}
+
+function getChaosWinningMove(player) {
+  const emptyCells = getEmptyCells();
+
+  for (const index of emptyCells) {
+    const nextBoard = board.slice();
+    nextBoard[index] = player;
+
+    if (getChaosWinnerForBoard(nextBoard)?.player === player) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function getChaosStrategicMove(player) {
+  const emptyCells = getEmptyCells();
+  let bestScore = -Infinity;
+  let bestMoves = [];
+
+  for (const index of emptyCells) {
+    const score = evaluateChaosMove(index, player);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMoves = [index];
+    } else if (score === bestScore) {
+      bestMoves.push(index);
+    }
+  }
+
+  return bestMoves.length > 0 ? pickRandom(bestMoves) : null;
+}
+
+function evaluateChaosMove(index, player) {
+  const nextBoard = board.slice();
+  nextBoard[index] = player;
+  const opponent = player === "X" ? "O" : "X";
+  let score = 0;
+
+  for (const pattern of winPatterns) {
+    if (!pattern.includes(index)) {
+      continue;
+    }
+
+    const compressedLine = pattern
+      .map((cellIndex) => nextBoard[cellIndex])
+      .filter((value) => value !== "blocked");
+
+    const playerCount = compressedLine.filter((value) => value === player).length;
+    const opponentCount = compressedLine.filter((value) => value === opponent).length;
+    const emptyCount = compressedLine.filter((value) => value === "").length;
+
+    if (opponentCount === 0) {
+      score += playerCount * 4;
+      score += emptyCount;
+    }
+
+    if (playerCount === 0) {
+      score -= opponentCount * 3;
+    }
+  }
+
+  const row = Math.floor(index / boardSize);
+  const col = index % boardSize;
+  if (row > 0 && row < boardSize - 1 && col > 0 && col < boardSize - 1) {
+    score += 3;
+  }
+
+  return score;
+}
+
+function getEmptyCells() {
+  return board
+    .map((value, index) => (value === "" ? index : null))
+    .filter((index) => index !== null);
+}
+
+function isChaosMode() {
+  return gameMode === "chaos" || gameMode === "chaos-ai";
+}
+
+function isComputerMode() {
+  return gameMode === "ai" || gameMode === "chaos-ai";
+}
+
+function animateCellRemoval(index, onComplete) {
+  const cell = cells[index];
+  if (!cell) {
+    return;
+  }
+
+  boardLocked = true;
+  updateBoardState();
+  cell.classList.add("removing");
+  playSound("block");
+
+  window.setTimeout(() => {
+    board[index] = "blocked";
+    boardLocked = false;
+    renderBoard();
+
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, 650);
 }
 
 function pickRandom(items) {
