@@ -787,15 +787,70 @@ function buildWinPatterns(size) {
     patterns.push(pattern);
   }
 
-  const leftDiagonal = [];
-  const rightDiagonal = [];
+  for (let startCol = 0; startCol < size; startCol += 1) {
+    const diagonal = [];
+    let row = 0;
+    let col = startCol;
 
-  for (let index = 0; index < size; index += 1) {
-    leftDiagonal.push(index * size + index);
-    rightDiagonal.push(index * size + (size - 1 - index));
+    while (row < size && col < size) {
+      diagonal.push(row * size + col);
+      row += 1;
+      col += 1;
+    }
+
+    if (diagonal.length >= 3) {
+      patterns.push(diagonal);
+    }
   }
 
-  patterns.push(leftDiagonal, rightDiagonal);
+  for (let startRow = 1; startRow < size; startRow += 1) {
+    const diagonal = [];
+    let row = startRow;
+    let col = 0;
+
+    while (row < size && col < size) {
+      diagonal.push(row * size + col);
+      row += 1;
+      col += 1;
+    }
+
+    if (diagonal.length >= 3) {
+      patterns.push(diagonal);
+    }
+  }
+
+  for (let startCol = 0; startCol < size; startCol += 1) {
+    const diagonal = [];
+    let row = 0;
+    let col = startCol;
+
+    while (row < size && col >= 0) {
+      diagonal.push(row * size + col);
+      row += 1;
+      col -= 1;
+    }
+
+    if (diagonal.length >= 3) {
+      patterns.push(diagonal);
+    }
+  }
+
+  for (let startRow = 1; startRow < size; startRow += 1) {
+    const diagonal = [];
+    let row = startRow;
+    let col = size - 1;
+
+    while (row < size && col >= 0) {
+      diagonal.push(row * size + col);
+      row += 1;
+      col -= 1;
+    }
+
+    if (diagonal.length >= 3) {
+      patterns.push(diagonal);
+    }
+  }
+
   return patterns;
 }
 
