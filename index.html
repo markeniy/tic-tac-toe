@@ -25,6 +25,15 @@
           <div class="hero-chip">Игра с ИИ</div>
         </div>
 
+        <div class="difficulty-panel" aria-label="Выбор сложности бота">
+          <p class="difficulty-title">Сложность бота</p>
+          <div class="difficulty-buttons">
+            <button id="easyDifficultyBtn" class="difficulty-btn active" type="button">Лёгкий</button>
+            <button id="mediumDifficultyBtn" class="difficulty-btn" type="button">Средний</button>
+            <button id="hardDifficultyBtn" class="difficulty-btn" type="button">Сложный</button>
+          </div>
+        </div>
+
         <div class="menu-buttons">
           <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
           <button id="aiModeBtn" type="button">Играть против компьютера</button>
@@ -36,6 +45,7 @@
           <button id="backBtn" class="secondary-btn" type="button">Назад</button>
           <div class="top-actions">
             <button id="soundToggleBtn" class="icon-btn" type="button">Звук: вкл</button>
+            <div id="difficultyBadge" class="mode-label"></div>
             <div id="modeLabel" class="mode-label"></div>
           </div>
         </div>

@@ -9,9 +9,13 @@ const resetAllBtn = document.getElementById("resetAllBtn");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const themeToggleBtnGame = document.getElementById("themeToggleBtnGame");
 const soundToggleBtn = document.getElementById("soundToggleBtn");
+const easyDifficultyBtn = document.getElementById("easyDifficultyBtn");
+const mediumDifficultyBtn = document.getElementById("mediumDifficultyBtn");
+const hardDifficultyBtn = document.getElementById("hardDifficultyBtn");
 
 const statusText = document.getElementById("status");
 const modeLabel = document.getElementById("modeLabel");
+const difficultyBadge = document.getElementById("difficultyBadge");
 
 const scoreXText = document.getElementById("scoreX");
 const scoreOText = document.getElementById("scoreO");
@@ -42,6 +46,7 @@ let gameMode = "pvp";
 let aiThinking = false;
 let currentTheme = localStorage.getItem("ticTacToeTheme") || "dark";
 let soundEnabled = localStorage.getItem("ticTacToeSound") !== "off";
+let botDifficulty = localStorage.getItem("ticTacToeDifficulty") || "medium";
 let audioContext = null;
 
 let scoreX = 0;
@@ -52,6 +57,7 @@ loadScores();
 updateScoreUI();
 applyTheme();
 updateSoundButton();
+applyDifficulty();
 
 twoPlayersBtn.addEventListener("click", () => startGame("pvp"));
 aiModeBtn.addEventListener("click", () => startGame("ai"));
@@ -61,6 +67,9 @@ resetAllBtn.addEventListener("click", resetAll);
 themeToggleBtn.addEventListener("click", toggleTheme);
 themeToggleBtnGame.addEventListener("click", toggleTheme);
 soundToggleBtn.addEventListener("click", toggleSound);
+easyDifficultyBtn.addEventListener("click", () => setDifficulty("easy"));
+mediumDifficultyBtn.addEventListener("click", () => setDifficulty("medium"));
+hardDifficultyBtn.addEventListener("click", () => setDifficulty("hard"));
 playAgainBtn.addEventListener("click", () => {
   hideModal();
   resetBoard();
@@ -78,6 +87,7 @@ function startGame(mode) {
   menuScreen.classList.remove("active");
   gameScreen.classList.add("active");
   modeLabel.textContent = mode === "ai" ? "Режим: против компьютера" : "Режим: вдвоём";
+  updateDifficultyBadge();
   resetBoard();
 }
 
@@ -288,6 +298,38 @@ function updateSoundButton() {
   soundToggleBtn.textContent = soundEnabled ? "Звук: вкл" : "Звук: выкл";
 }
 
+function setDifficulty(level) {
+  botDifficulty = level;
+  localStorage.setItem("ticTacToeDifficulty", botDifficulty);
+  applyDifficulty();
+  updateDifficultyBadge();
+  playSound("toggle");
+}
+
+function applyDifficulty() {
+  easyDifficultyBtn.classList.toggle("active", botDifficulty === "easy");
+  mediumDifficultyBtn.classList.toggle("active", botDifficulty === "medium");
+  hardDifficultyBtn.classList.toggle("active", botDifficulty === "hard");
+  updateDifficultyBadge();
+}
+
+function updateDifficultyBadge() {
+  const label = getDifficultyLabel();
+  difficultyBadge.textContent = gameMode === "ai" ? `Бот: ${label}` : `Сложность ИИ: ${label}`;
+}
+
+function getDifficultyLabel() {
+  if (botDifficulty === "easy") {
+    return "лёгкий";
+  }
+
+  if (botDifficulty === "hard") {
+    return "сложный";
+  }
+
+  return "средний";
+}
+
 function loadScores() {
   const saved = localStorage.getItem("ticTacToeScores");
   if (!saved) {
@@ -313,30 +355,7 @@ function aiMove() {
     return;
   }
 
-  let move = findWinningMove("O");
-
-  if (move === -1) {
-    move = findWinningMove("X");
-  }
-
-  if (move === -1 && board[4] === "") {
-    move = 4;
-  }
-
-  if (move === -1) {
-    const corners = [0, 2, 6, 8].filter((index) => board[index] === "");
-    if (corners.length > 0) {
-      move = corners[Math.floor(Math.random() * corners.length)];
-    }
-  }
-
-  if (move === -1) {
-    const emptyCells = board
-      .map((value, index) => (value === "" ? index : null))
-      .filter((index) => index !== null);
-
-    move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-  }
+  const move = getAiMove();
 
   aiThinking = false;
   makeMove(move, "O");
@@ -371,6 +390,180 @@ function findWinningMove(player) {
   }
 
   return -1;
+}
+
+function getAiMove() {
+  if (botDifficulty === "easy") {
+    return getEasyMove();
+  }
+
+  if (botDifficulty === "hard") {
+    return getHardMove();
+  }
+
+  return getMediumMove();
+}
+
+function getEasyMove() {
+  const randomChance = Math.random();
+
+  if (randomChance < 0.7) {
+    return getRandomMove();
+  }
+
+  const winningMove = findWinningMove("O");
+  if (winningMove !== -1) {
+    return winningMove;
+  }
+
+  if (randomChance < 0.9) {
+    return getRandomMove();
+  }
+
+  const blockMove = findWinningMove("X");
+  if (blockMove !== -1) {
+    return blockMove;
+  }
+
+  return getRandomMove();
+}
+
+function getMediumMove() {
+  if (Math.random() < 0.35) {
+    return getRandomMove();
+  }
+
+  const winningMove = findWinningMove("O");
+  if (winningMove !== -1) {
+    return winningMove;
+  }
+
+  const blockMove = findWinningMove("X");
+  if (blockMove !== -1) {
+    return blockMove;
+  }
+
+  if (Math.random() < 0.5) {
+    const tacticalMoves = getStrategicMoves();
+    if (tacticalMoves.length > 0) {
+      return pickRandom(tacticalMoves);
+    }
+  }
+
+  return getRandomMove();
+}
+
+function getHardMove() {
+  const result = minimax(board.slice(), "O", 0);
+  return typeof result.index === "number" ? result.index : getRandomMove();
+}
+
+function getStrategicMoves() {
+  const moves = [];
+
+  if (board[4] === "") {
+    moves.push(4);
+  }
+
+  const corners = [0, 2, 6, 8].filter((index) => board[index] === "");
+  moves.push(...corners);
+
+  const sides = [1, 3, 5, 7].filter((index) => board[index] === "");
+  moves.push(...sides);
+
+  return moves;
+}
+
+function getRandomMove() {
+  const emptyCells = board
+    .map((value, index) => (value === "" ? index : null))
+    .filter((index) => index !== null);
+
+  return pickRandom(emptyCells);
+}
+
+function minimax(nextBoard, player, depth) {
+  const winner = getWinnerForBoard(nextBoard);
+
+  if (winner === "O") {
+    return { score: 10 - depth };
+  }
+
+  if (winner === "X") {
+    return { score: depth - 10 };
+  }
+
+  if (isDrawForBoard(nextBoard)) {
+    return { score: 0 };
+  }
+
+  const moves = [];
+
+  for (let index = 0; index < nextBoard.length; index += 1) {
+    if (nextBoard[index] !== "") {
+      continue;
+    }
+
+    const move = { index };
+    nextBoard[index] = player;
+
+    if (player === "O") {
+      move.score = minimax(nextBoard, "X", depth + 1).score;
+    } else {
+      move.score = minimax(nextBoard, "O", depth + 1).score;
+    }
+
+    nextBoard[index] = "";
+    moves.push(move);
+  }
+
+  if (player === "O") {
+    let bestScore = -Infinity;
+    let bestMoves = [];
+
+    for (const move of moves) {
+      if (move.score > bestScore) {
+        bestScore = move.score;
+        bestMoves = [move];
+      } else if (move.score === bestScore) {
+        bestMoves.push(move);
+      }
+    }
+
+    return pickRandom(bestMoves);
+  }
+
+  let bestScore = Infinity;
+  let bestMoves = [];
+
+  for (const move of moves) {
+    if (move.score < bestScore) {
+      bestScore = move.score;
+      bestMoves = [move];
+    } else if (move.score === bestScore) {
+      bestMoves.push(move);
+    }
+  }
+
+  return pickRandom(bestMoves);
+}
+
+function getWinnerForBoard(nextBoard) {
+  for (const [a, b, c] of winPatterns) {
+    if (nextBoard[a] && nextBoard[a] === nextBoard[b] && nextBoard[b] === nextBoard[c]) {
+      return nextBoard[a];
+    }
+  }
+
+  return null;
+}
+
+function isDrawForBoard(nextBoard) {
+  return nextBoard.every((cell) => cell !== "") && !getWinnerForBoard(nextBoard);
+}
+
+function pickRandom(items) {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
 function showModal(title, text) {
