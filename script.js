@@ -184,6 +184,7 @@ function makeMove(index, player) {
 }
 
 function removeRandomEmptyCell() {
+  const edgeEmptyCells = getEdgeEmptyCells();
   const emptyCells = board
     .map((value, index) => (value === "" ? index : null))
     .filter((index) => index !== null);
@@ -192,7 +193,8 @@ function removeRandomEmptyCell() {
     return;
   }
 
-  const removedIndex = pickRandom(emptyCells);
+  const removableCells = edgeEmptyCells.length > 0 ? edgeEmptyCells : emptyCells;
+  const removedIndex = pickRandom(removableCells);
   board[removedIndex] = "blocked";
   playSound("block");
   renderBoard();
@@ -684,6 +686,26 @@ function buildWinPatterns(size) {
 
   patterns.push(leftDiagonal, rightDiagonal);
   return patterns;
+}
+
+function getEdgeEmptyCells() {
+  const edgeCells = [];
+
+  for (let index = 0; index < board.length; index += 1) {
+    if (board[index] !== "") {
+      continue;
+    }
+
+    const row = Math.floor(index / boardSize);
+    const col = index % boardSize;
+    const isEdge = row === 0 || row === boardSize - 1 || col === 0 || col === boardSize - 1;
+
+    if (isEdge) {
+      edgeCells.push(index);
+    }
+  }
+
+  return edgeCells;
 }
 
 function pickRandom(items) {
