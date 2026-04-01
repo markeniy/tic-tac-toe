@@ -220,75 +220,80 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      <div className="app-card">
-        <div className="app-topbar">
-          <Header />
-          <div className="topbar-actions">
-            <button type="button" className="add-track-button" onClick={handleToggleForm}>
-              Add Track
-            </button>
-            <button type="button" className="secondary-button" onClick={handleSignOut}>
-              Sign Out
-            </button>
+      <main className="app-shell">
+        <div className="app-card">
+          <div className="app-topbar">
+            <Header trackCount={tracks.length} userEmail={session.user.email} />
+            <div className="topbar-actions">
+              <button type="button" className="add-track-button" onClick={handleToggleForm}>
+                {isFormOpen ? 'Close Form' : 'Add Track'}
+              </button>
+              <button type="button" className="secondary-button" onClick={handleSignOut}>
+                Sign Out
+              </button>
+            </div>
           </div>
+
+          {isFormOpen ? (
+            <form className="track-form" onSubmit={handleSubmit}>
+              <div className="section-heading form-heading">
+                <p className="section-label">Track Editor</p>
+                <h2 className="section-title">
+                  {editingTrackId ? 'Refine Track Details' : 'Add New Track'}
+                </h2>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="title">Title</label>
+                <input
+                  id="title"
+                  name="title"
+                  type="text"
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder="Enter track title"
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="bpm">BPM</label>
+                <input
+                  id="bpm"
+                  name="bpm"
+                  type="number"
+                  value={formData.bpm}
+                  onChange={handleChange}
+                  placeholder="Enter BPM"
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="status">Status</label>
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                >
+                  <option value="idea">Idea</option>
+                  <option value="draft">Draft</option>
+                  <option value="mix">Mix</option>
+                  <option value="released">Released</option>
+                </select>
+              </div>
+
+              <button type="submit" className="save-track-button">
+                {editingTrackId ? 'Update Track' : 'Save Track'}
+              </button>
+            </form>
+          ) : null}
+
+          <StatusFilter activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+          <TrackList tracks={filteredTracks} onDelete={handleDelete} onEdit={handleEdit} />
         </div>
-
-        <p className="auth-text">Signed in as {session.user.email}</p>
-
-        {isFormOpen ? (
-          <form className="track-form" onSubmit={handleSubmit}>
-            <div className="form-field">
-              <label htmlFor="title">Title</label>
-              <input
-                id="title"
-                name="title"
-                type="text"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="Enter track title"
-                required
-              />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="bpm">BPM</label>
-              <input
-                id="bpm"
-                name="bpm"
-                type="number"
-                value={formData.bpm}
-                onChange={handleChange}
-                placeholder="Enter BPM"
-                required
-              />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="status">Status</label>
-              <select
-                id="status"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-              >
-                <option value="idea">Idea</option>
-                <option value="draft">Draft</option>
-                <option value="mix">Mix</option>
-                <option value="released">Released</option>
-              </select>
-            </div>
-
-            <button type="submit" className="save-track-button">
-              {editingTrackId ? 'Update' : 'Save'}
-            </button>
-          </form>
-        ) : null}
-
-        <StatusFilter activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-        <TrackList tracks={filteredTracks} onDelete={handleDelete} onEdit={handleEdit} />
-      </div>
-    </main>
+      </main>
   );
 }
 

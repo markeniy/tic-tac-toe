@@ -8,7 +8,13 @@ const statuses = [
 
 function StatusFilter({ activeFilter, onFilterChange }) {
   return (
-    <div className="status-filter">
+    <div className="status-filter-wrap">
+      <div className="section-heading">
+        <p className="section-label">Filter Library</p>
+        <h2 className="section-title">Track Status</h2>
+      </div>
+
+      <div className="status-filter">
       {statuses.map(function (status) {
         return (
           <button
@@ -25,6 +31,7 @@ function StatusFilter({ activeFilter, onFilterChange }) {
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

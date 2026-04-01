@@ -6,6 +6,19 @@ function AuthForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  async function handleGoogleSignIn() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      console.error('Google auth error:', error);
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -34,10 +47,23 @@ function AuthForm() {
   return (
     <main className="auth-shell">
       <div className="auth-card">
+        <p className="auth-eyebrow">Private Artist Workspace</p>
         <h1 className="app-title">Track Vault</h1>
         <p className="auth-text">
           Sign in to see your private tracks or create a new account.
         </p>
+
+        <button
+          type="button"
+          className="oauth-button"
+          onClick={handleGoogleSignIn}
+        >
+          Continue with Google
+        </button>
+
+        <div className="auth-divider">
+          <span>or use email</span>
+        </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-field">
@@ -75,7 +101,7 @@ function AuthForm() {
 
         <button
           type="button"
-          className="secondary-button"
+          className="secondary-button auth-switch-button"
           onClick={function () {
             setMode(function (currentMode) {
               return currentMode === 'sign-up' ? 'sign-in' : 'sign-up';
