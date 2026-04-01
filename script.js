@@ -1,8 +1,11 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const menuScreen = document.getElementById("menuScreen");
 const gameScreen = document.getElementById("gameScreen");
 
 const twoPlayersBtn = document.getElementById("twoPlayersBtn");
 const aiModeBtn = document.getElementById("aiModeBtn");
+const onlineModeBtn = document.getElementById("onlineModeBtn");
 const variantPicker = document.getElementById("variantPicker");
 const variantPickerTitle = document.getElementById("variantPickerTitle");
 const standardVariantBtn = document.getElementById("standardVariantBtn");
@@ -10,6 +13,13 @@ const chaosVariantBtn = document.getElementById("chaosVariantBtn");
 const pickerDifficultyPanel = document.getElementById("pickerDifficultyPanel");
 const startAiVariantBtn = document.getElementById("startAiVariantBtn");
 const closeVariantPickerBtn = document.getElementById("closeVariantPickerBtn");
+const onlinePanel = document.getElementById("onlinePanel");
+const createRoomBtn = document.getElementById("createRoomBtn");
+const roomCodeInput = document.getElementById("roomCodeInput");
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+const closeOnlinePanelBtn = document.getElementById("closeOnlinePanelBtn");
+const onlineConfigHint = document.getElementById("onlineConfigHint");
+const onlinePanelMessage = document.getElementById("onlinePanelMessage");
 const backBtn = document.getElementById("backBtn");
 const newRoundBtn = document.getElementById("newRoundBtn");
 const resetAllBtn = document.getElementById("resetAllBtn");
@@ -19,6 +29,12 @@ const soundToggleBtn = document.getElementById("soundToggleBtn");
 const easyDifficultyBtn = document.getElementById("easyDifficultyBtn");
 const mediumDifficultyBtn = document.getElementById("mediumDifficultyBtn");
 const hardDifficultyBtn = document.getElementById("hardDifficultyBtn");
+const onlineRoomPanel = document.getElementById("onlineRoomPanel");
+const roomCodeBadge = document.getElementById("roomCodeBadge");
+const playerBadge = document.getElementById("playerBadge");
+const shareLinkInput = document.getElementById("shareLinkInput");
+const copyInviteBtn = document.getElementById("copyInviteBtn");
+const scoreboard = document.getElementById("scoreboard");
 
 const boardNode = document.getElementById("board");
 const statusText = document.getElementById("status");
@@ -34,6 +50,13 @@ const resultModal = document.getElementById("resultModal");
 const resultTitle = document.getElementById("resultTitle");
 const resultText = document.getElementById("resultText");
 const playAgainBtn = document.getElementById("playAgainBtn");
+
+const ONLINE_STORAGE_KEY = "ticTacToeOnlineRoles";
+const SUPABASE_CONFIG = window.TIC_TAC_TOE_CONFIG || {};
+const hasSupabaseConfig = Boolean(SUPABASE_CONFIG.supabaseUrl && SUPABASE_CONFIG.supabaseAnonKey);
+const supabase = hasSupabaseConfig
+  ? createClient(SUPABASE_CONFIG.supabaseUrl, SUPABASE_CONFIG.supabaseAnonKey)
+  : null;
 
 let cells = [];
 let winPatterns = [];
@@ -51,6 +74,11 @@ let currentTheme = localStorage.getItem("ticTacToeTheme") || "dark";
 let soundEnabled = localStorage.getItem("ticTacToeSound") !== "off";
 let botDifficulty = localStorage.getItem("ticTacToeDifficulty") || "medium";
 let audioContext = null;
+let onlineChannel = null;
+let onlineRoomCode = "";
+let onlinePlayerSymbol = "";
+let onlineState = null;
+let onlineResultSignature = "";
 
 let scoreX = 0;
 let scoreO = 0;
@@ -61,16 +89,24 @@ updateScoreUI();
 applyTheme();
 updateSoundButton();
 applyDifficulty();
+updateOnlineSetupHint();
 
 twoPlayersBtn.addEventListener("click", () => openVariantPicker("pvp"));
 aiModeBtn.addEventListener("click", () => openVariantPicker("ai"));
+onlineModeBtn.addEventListener("click", openOnlinePanel);
 standardVariantBtn.addEventListener("click", () => startSelectedVariant("standard"));
 chaosVariantBtn.addEventListener("click", () => startSelectedVariant("chaos"));
 startAiVariantBtn.addEventListener("click", startComputerVariant);
 closeVariantPickerBtn.addEventListener("click", closeVariantPicker);
+createRoomBtn.addEventListener("click", createOnlineRoom);
+joinRoomBtn.addEventListener("click", joinOnlineRoom);
+closeOnlinePanelBtn.addEventListener("click", closeOnlinePanel);
+roomCodeInput.addEventListener("input", () => {
+  roomCodeInput.value = normalizeRoomCode(roomCodeInput.value);
+});
 backBtn.addEventListener("click", goToMenu);
-newRoundBtn.addEventListener("click", resetBoard);
-resetAllBtn.addEventListener("click", resetAll);
+newRoundBtn.addEventListener("click", handleNewRound);
+resetAllBtn.addEventListener("click", handleSecondaryAction);
 themeToggleBtn.addEventListener("click", toggleTheme);
 themeToggleBtnGame.addEventListener("click", toggleTheme);
 soundToggleBtn.addEventListener("click", toggleSound);
@@ -79,8 +115,17 @@ mediumDifficultyBtn.addEventListener("click", () => setDifficulty("medium"));
 hardDifficultyBtn.addEventListener("click", () => setDifficulty("hard"));
 playAgainBtn.addEventListener("click", () => {
   hideModal();
+  if (isOnlineMode()) {
+    void resetOnlineRoom();
+    return;
+  }
   resetBoard();
 });
+copyInviteBtn.addEventListener("click", copyInviteLink);
+
+if (hasSupabaseConfig) {
+  void tryJoinRoomFromUrl();
+}
 
 function startGame(mode) {
   gameMode = mode;
@@ -92,12 +137,16 @@ function startGame(mode) {
   gameScreen.classList.add("active");
   updateModeLabel();
   updateDifficultyBadge();
+  updateActionButtons();
+  updateScoreboardVisibility();
+  updateOnlineRoomPanel();
   resetBoard();
 }
 
 function openVariantPicker(baseMode) {
   pendingMenuMode = baseMode;
   pendingVariant = null;
+  closeOnlinePanel();
   variantPickerTitle.textContent = "Выберите вариант";
   pickerDifficultyPanel.classList.add("hidden");
   startAiVariantBtn.classList.add("hidden");
@@ -111,6 +160,18 @@ function closeVariantPicker() {
   pickerDifficultyPanel.classList.add("hidden");
   startAiVariantBtn.classList.add("hidden");
   variantPicker.classList.add("hidden");
+}
+
+function openOnlinePanel() {
+  closeVariantPicker();
+  clearOnlinePanelMessage();
+  roomCodeInput.value = "";
+  onlinePanel.classList.remove("hidden");
+}
+
+function closeOnlinePanel() {
+  onlinePanel.classList.add("hidden");
+  clearOnlinePanelMessage();
 }
 
 function startSelectedVariant(variant) {
@@ -139,18 +200,203 @@ function startComputerVariant() {
   closeVariantPicker();
 }
 
+async function createOnlineRoom() {
+  if (!ensureOnlineReady()) {
+    return;
+  }
+
+  setOnlinePanelMessage("Создаю комнату...");
+
+  const roomCode = generateRoomCode();
+  const { data, error } = await supabase
+    .from("online_rooms")
+    .insert({
+      room_code: roomCode,
+      board: createEmptyBoard(3),
+      current_player: "X",
+      status: "waiting",
+      winner: null,
+      winning_pattern: [],
+      board_size: 3
+    })
+    .select()
+    .single();
+
+  if (error) {
+    setOnlinePanelMessage("Не получилось создать комнату. Проверь Supabase и SQL-настройку.");
+    return;
+  }
+
+  persistOnlineRole(roomCode, "X");
+  closeOnlinePanel();
+  await startOnlineSession(data, "X");
+}
+
+async function joinOnlineRoom() {
+  if (!ensureOnlineReady()) {
+    return;
+  }
+
+  const roomCode = normalizeRoomCode(roomCodeInput.value);
+  roomCodeInput.value = roomCode;
+
+  if (!roomCode) {
+    setOnlinePanelMessage("Введите код комнаты.");
+    return;
+  }
+
+  setOnlinePanelMessage("Подключаюсь к комнате...");
+
+  const { data: room, error } = await supabase
+    .from("online_rooms")
+    .select("*")
+    .eq("room_code", roomCode)
+    .maybeSingle();
+
+  if (error || !room) {
+    setOnlinePanelMessage("Комната не найдена.");
+    return;
+  }
+
+  const savedRole = getSavedOnlineRole(roomCode);
+  let assignedRole = savedRole;
+
+  if (!assignedRole) {
+    if (room.status === "waiting") {
+      const { data: joinedRoom, error: joinError } = await supabase
+        .from("online_rooms")
+        .update({
+          status: "playing"
+        })
+        .eq("room_code", roomCode)
+        .eq("status", "waiting")
+        .select()
+        .single();
+
+      if (joinError || !joinedRoom) {
+        setOnlinePanelMessage("Не удалось занять слот игрока O.");
+        return;
+      }
+
+      persistOnlineRole(roomCode, "O");
+      assignedRole = "O";
+      closeOnlinePanel();
+      await startOnlineSession(joinedRoom, assignedRole);
+      return;
+    }
+
+    setOnlinePanelMessage("Комната уже занята. Если это твоя комната, открой её на том же устройстве.");
+    return;
+  }
+
+  closeOnlinePanel();
+  await startOnlineSession(room, assignedRole);
+}
+
+async function startOnlineSession(room, playerSymbol) {
+  leaveOnlineRoom({ keepUi: true });
+
+  onlineRoomCode = room.room_code;
+  onlinePlayerSymbol = playerSymbol;
+  onlineState = room;
+
+  gameMode = "online";
+  boardSize = 3;
+  winPatterns = buildStandardWinPatterns(boardSize);
+  chaosPatterns = [];
+
+  menuScreen.classList.remove("active");
+  gameScreen.classList.add("active");
+  updateModeLabel();
+  updateDifficultyBadge();
+  updateActionButtons();
+  updateScoreboardVisibility();
+  updateOnlineRoomPanel();
+  createBoardCells();
+  applyOnlineState(room);
+  hideModal();
+  clearOnlinePanelMessage();
+  subscribeToOnlineRoom(room.room_code);
+}
+
+function subscribeToOnlineRoom(roomCode) {
+  if (!supabase) {
+    return;
+  }
+
+  if (onlineChannel) {
+    void supabase.removeChannel(onlineChannel);
+  }
+
+  onlineChannel = supabase
+    .channel(`online-room-${roomCode}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "online_rooms",
+        filter: `room_code=eq.${roomCode}`
+      },
+      (payload) => {
+        if (payload.new) {
+          applyOnlineState(payload.new);
+        }
+      }
+    )
+    .subscribe();
+}
+
+async function tryJoinRoomFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const roomCode = normalizeRoomCode(params.get("room") || "");
+  if (!roomCode) {
+    return;
+  }
+
+  roomCodeInput.value = roomCode;
+  openOnlinePanel();
+  await joinOnlineRoom();
+}
+
 function goToMenu() {
+  if (isOnlineMode()) {
+    leaveOnlineRoom();
+  }
+
   gameActive = false;
   aiThinking = false;
+  boardLocked = false;
   gameScreen.classList.remove("active");
   menuScreen.classList.add("active");
   closeVariantPicker();
+  closeOnlinePanel();
   hideModal();
   hideResultBanner();
 }
 
+function leaveOnlineRoom(options = {}) {
+  if (onlineChannel && supabase) {
+    void supabase.removeChannel(onlineChannel);
+  }
+
+  onlineChannel = null;
+  onlineRoomCode = "";
+  onlinePlayerSymbol = "";
+  onlineState = null;
+  onlineResultSignature = "";
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url);
+
+  if (!options.keepUi) {
+    updateOnlineRoomPanel();
+  }
+}
+
 function resetBoard() {
-  board = Array(boardSize * boardSize).fill("");
+  board = createEmptyBoard(boardSize);
   currentPlayer = "X";
   gameActive = true;
   aiThinking = false;
@@ -193,6 +439,11 @@ function createBoardCells() {
 
 function handleCellClick(index) {
   if (!gameActive || aiThinking || boardLocked || board[index] !== "") {
+    return;
+  }
+
+  if (isOnlineMode()) {
+    void handleOnlineMove(index);
     return;
   }
 
@@ -244,6 +495,56 @@ function handleCellClick(index) {
   }
 }
 
+async function handleOnlineMove(index) {
+  if (!onlineState || onlineState.status !== "playing" || currentPlayer !== onlinePlayerSymbol) {
+    return;
+  }
+
+  boardLocked = true;
+  updateBoardState();
+
+  const nextBoard = board.slice();
+  nextBoard[index] = onlinePlayerSymbol;
+  const winnerData = getWinnerForBoard(nextBoard);
+  const draw = !winnerData && isDrawForBoard(nextBoard);
+
+  const patch = {
+    board: nextBoard,
+    current_player: onlinePlayerSymbol === "X" ? "O" : "X",
+    winner: null,
+    winning_pattern: [],
+    status: "playing"
+  };
+
+  if (winnerData) {
+    patch.winner = winnerData.player;
+    patch.winning_pattern = winnerData.pattern;
+    patch.status = "finished";
+  } else if (draw) {
+    patch.winner = "draw";
+    patch.status = "finished";
+  }
+
+  const { data, error } = await supabase
+    .from("online_rooms")
+    .update(patch)
+    .eq("room_code", onlineRoomCode)
+    .eq("status", "playing")
+    .eq("current_player", onlinePlayerSymbol)
+    .select()
+    .single();
+
+  boardLocked = false;
+
+  if (error || !data) {
+    showResultBanner("Ход не применился. Комната уже обновилась у другого игрока.");
+    updateBoardState();
+    return;
+  }
+
+  applyOnlineState(data);
+}
+
 function makeMove(index, player) {
   board[index] = player;
   const cell = cells[index];
@@ -281,7 +582,7 @@ function renderBoard() {
   cells.forEach((cell, index) => {
     const value = board[index];
     cell.textContent = value === "blocked" ? "" : value;
-    cell.classList.remove("x", "o", "blocked");
+    cell.classList.remove("x", "o", "blocked", "winner", "pop", "removing");
 
     if (value === "X") {
       cell.classList.add("x");
@@ -298,7 +599,14 @@ function renderBoard() {
 function updateBoardState() {
   cells.forEach((cell, index) => {
     const blockedForAiTurn = isComputerMode() && currentPlayer === "O";
-    cell.disabled = !gameActive || aiThinking || boardLocked || blockedForAiTurn || board[index] !== "";
+    const blockedForOnlineTurn = isOnlineMode()
+      && (!onlineState || onlineState.status !== "playing" || currentPlayer !== onlinePlayerSymbol);
+    cell.disabled = !gameActive
+      || aiThinking
+      || boardLocked
+      || blockedForAiTurn
+      || blockedForOnlineTurn
+      || board[index] !== "";
   });
 }
 
@@ -386,9 +694,74 @@ function finishGameWithDraw() {
   showResultBanner(text);
 }
 
+function applyOnlineState(room) {
+  onlineState = room;
+  board = Array.isArray(room.board) ? room.board : createEmptyBoard(3);
+  currentPlayer = room.current_player || "X";
+  gameActive = room.status === "playing";
+  aiThinking = false;
+  boardLocked = false;
+
+  if (cells.length !== board.length) {
+    createBoardCells();
+  } else {
+    renderBoard();
+  }
+
+  hideModal();
+  hideResultBanner();
+  updateStatus();
+  updateBoardState();
+
+  if (room.status === "waiting") {
+    onlineResultSignature = "";
+    statusText.textContent = "Ждём второго игрока. Отправь другу код комнаты.";
+    showResultBanner("Комната создана. Второй игрок может зайти по коду или ссылке.");
+    return;
+  }
+
+  if (room.status === "finished") {
+    const resultSignature = `${room.room_code}:${room.winner}:${room.updated_at || ""}`;
+    gameActive = false;
+    updateBoardState();
+
+    if (room.winner === "draw") {
+      statusText.textContent = "Ничья";
+      showResultBanner("Матч завершился вничью.");
+      if (onlineResultSignature !== resultSignature) {
+        playSound("draw");
+      }
+      onlineResultSignature = resultSignature;
+      return;
+    }
+
+    if (Array.isArray(room.winning_pattern)) {
+      highlightWinner(room.winning_pattern);
+    }
+
+    statusText.textContent = room.winner === onlinePlayerSymbol
+      ? "Ты победил"
+      : "Соперник победил";
+    showResultBanner(
+      room.winner === onlinePlayerSymbol
+        ? "Ты победил в онлайн-матче."
+        : `Игрок ${room.winner} победил в онлайн-матче.`
+    );
+    if (onlineResultSignature !== resultSignature) {
+      playSound("win");
+    }
+    onlineResultSignature = resultSignature;
+    return;
+  }
+
+  onlineResultSignature = "";
+}
+
 function highlightWinner(pattern) {
   pattern.forEach((index) => {
-    cells[index].classList.add("winner");
+    if (cells[index]) {
+      cells[index].classList.add("winner");
+    }
   });
 }
 
@@ -399,6 +772,30 @@ function updateScoreUI() {
 }
 
 function updateStatus() {
+  if (isOnlineMode()) {
+    if (!onlineState || onlineState.status === "waiting") {
+      statusText.textContent = "Ждём второго игрока...";
+      return;
+    }
+
+    if (onlineState.status === "finished") {
+      if (onlineState.winner === "draw") {
+        statusText.textContent = "Ничья";
+        return;
+      }
+
+      statusText.textContent = onlineState.winner === onlinePlayerSymbol
+        ? "Ты победил"
+        : "Соперник победил";
+      return;
+    }
+
+    statusText.textContent = currentPlayer === onlinePlayerSymbol
+      ? `Твой ход: ${onlinePlayerSymbol}`
+      : `Ход соперника: ${currentPlayer}`;
+    return;
+  }
+
   if (aiThinking) {
     statusText.textContent = "Ход компьютера: O";
     return;
@@ -418,6 +815,11 @@ function updateStatus() {
 }
 
 function updateModeLabel() {
+  if (gameMode === "online") {
+    modeLabel.textContent = "Режим: онлайн 3x3";
+    return;
+  }
+
   if (gameMode === "ai") {
     modeLabel.textContent = "Режим: против компьютера";
     return;
@@ -509,6 +911,11 @@ function applyDifficulty() {
 }
 
 function updateDifficultyBadge() {
+  if (isOnlineMode()) {
+    difficultyBadge.textContent = `Ты: ${onlinePlayerSymbol || "?"}`;
+    return;
+  }
+
   if (isComputerMode()) {
     difficultyBadge.textContent = `Бот: ${getDifficultyLabel()}`;
     return;
@@ -520,6 +927,47 @@ function updateDifficultyBadge() {
   }
 
   difficultyBadge.textContent = "Локальная игра";
+}
+
+function updateActionButtons() {
+  if (isOnlineMode()) {
+    newRoundBtn.textContent = "Новый матч";
+    resetAllBtn.textContent = "Выйти из комнаты";
+    return;
+  }
+
+  newRoundBtn.textContent = "Новый раунд";
+  resetAllBtn.textContent = "Сбросить всё";
+}
+
+function updateScoreboardVisibility() {
+  scoreboard.classList.toggle("hidden", isOnlineMode());
+}
+
+function updateOnlineRoomPanel() {
+  const shouldShow = isOnlineMode() && onlineRoomCode;
+  onlineRoomPanel.classList.toggle("hidden", !shouldShow);
+
+  if (!shouldShow) {
+    return;
+  }
+
+  roomCodeBadge.textContent = `Комната: ${onlineRoomCode}`;
+  playerBadge.textContent = `Ты играешь за: ${onlinePlayerSymbol}`;
+  shareLinkInput.value = `${window.location.origin}${window.location.pathname}?room=${onlineRoomCode}`;
+}
+
+function updateOnlineSetupHint() {
+  onlineConfigHint.classList.toggle("hidden", hasSupabaseConfig);
+}
+
+function setOnlinePanelMessage(text) {
+  onlinePanelMessage.textContent = text;
+  onlinePanelMessage.classList.toggle("hidden", !text);
+}
+
+function clearOnlinePanelMessage() {
+  setOnlinePanelMessage("");
 }
 
 function getDifficultyLabel() {
@@ -1210,4 +1658,105 @@ function tone(context, frequency, startTime, duration, waveType, volume) {
 
   oscillator.start(startTime);
   oscillator.stop(startTime + duration + 0.02);
+}
+
+function handleNewRound() {
+  if (isOnlineMode()) {
+    void resetOnlineRoom();
+    return;
+  }
+
+  resetBoard();
+}
+
+function handleSecondaryAction() {
+  if (isOnlineMode()) {
+    goToMenu();
+    return;
+  }
+
+  resetAll();
+}
+
+async function resetOnlineRoom() {
+  if (!supabase || !onlineRoomCode || !onlineState || onlineState.status === "waiting") {
+    return;
+  }
+
+  boardLocked = true;
+  updateBoardState();
+
+  const { data, error } = await supabase
+    .from("online_rooms")
+    .update({
+      board: createEmptyBoard(3),
+      current_player: "X",
+      status: "playing",
+      winner: null,
+      winning_pattern: []
+    })
+    .eq("room_code", onlineRoomCode)
+    .select()
+    .single();
+
+  boardLocked = false;
+
+  if (error || !data) {
+    showResultBanner("Не получилось начать новый матч.");
+    updateBoardState();
+    return;
+  }
+
+  applyOnlineState(data);
+}
+
+async function copyInviteLink() {
+  if (!shareLinkInput.value) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(shareLinkInput.value);
+    showResultBanner("Ссылка скопирована.");
+  } catch (error) {
+    shareLinkInput.select();
+    showResultBanner("Скопируй ссылку вручную из поля.");
+  }
+}
+
+function ensureOnlineReady() {
+  if (hasSupabaseConfig) {
+    return true;
+  }
+
+  setOnlinePanelMessage("Сначала заполни config.js данными своего Supabase-проекта.");
+  return false;
+}
+
+function normalizeRoomCode(value) {
+  return value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 6);
+}
+
+function generateRoomCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+}
+
+function createEmptyBoard(size) {
+  return Array(size * size).fill("");
+}
+
+function persistOnlineRole(roomCode, role) {
+  const stored = JSON.parse(localStorage.getItem(ONLINE_STORAGE_KEY) || "{}");
+  stored[roomCode] = role;
+  localStorage.setItem(ONLINE_STORAGE_KEY, JSON.stringify(stored));
+}
+
+function getSavedOnlineRole(roomCode) {
+  const stored = JSON.parse(localStorage.getItem(ONLINE_STORAGE_KEY) || "{}");
+  return stored[roomCode] || "";
+}
+
+function isOnlineMode() {
+  return gameMode === "online";
 }

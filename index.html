@@ -23,12 +23,13 @@
           <div class="hero-chip">Живой звук</div>
           <div class="hero-chip">Счёт сохраняется</div>
           <div class="hero-chip">Игра с ИИ</div>
-          <div class="hero-chip">Режим 4x4</div>
+          <div class="hero-chip">Онлайн комнаты</div>
         </div>
 
         <div class="menu-buttons">
           <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
           <button id="aiModeBtn" type="button">Играть против компьютера</button>
+          <button id="onlineModeBtn" class="secondary-btn" type="button">Играть онлайн</button>
         </div>
 
         <div id="variantPicker" class="variant-picker hidden" aria-label="Выбор варианта игры">
@@ -47,6 +48,21 @@
           </div>
           <button id="startAiVariantBtn" class="hidden" type="button">Начать игру с ботом</button>
           <button id="closeVariantPickerBtn" class="ghost-btn" type="button">Отмена</button>
+        </div>
+
+        <div id="onlinePanel" class="variant-picker hidden" aria-label="Онлайн игра">
+          <p class="difficulty-title">Онлайн 3x3</p>
+          <p class="panel-copy">Создайте комнату и отправьте другу код или ссылку. Ничего ставить не нужно.</p>
+          <div class="menu-buttons">
+            <button id="createRoomBtn" type="button">Создать комнату</button>
+          </div>
+          <div class="join-room-row">
+            <input id="roomCodeInput" class="code-input" type="text" maxlength="6" placeholder="Код комнаты" autocomplete="off" />
+            <button id="joinRoomBtn" class="secondary-btn" type="button">Войти</button>
+          </div>
+          <p id="onlineConfigHint" class="setup-hint hidden">Нужно заполнить `config.js` данными Supabase, тогда онлайн заработает.</p>
+          <p id="onlinePanelMessage" class="panel-message hidden"></p>
+          <button id="closeOnlinePanelBtn" class="ghost-btn" type="button">Отмена</button>
         </div>
       </div>
 
@@ -67,10 +83,22 @@
           </div>
           <button id="themeToggleBtnGame" class="icon-btn" type="button" aria-label="Переключить тему">Тема</button>
         </div>
+
+        <div id="onlineRoomPanel" class="online-room-panel hidden">
+          <div class="online-room-copy">
+            <span id="roomCodeBadge" class="hero-chip">Комната</span>
+            <span id="playerBadge" class="hero-chip">Игрок</span>
+          </div>
+          <div class="online-room-actions">
+            <input id="shareLinkInput" class="share-input" type="text" readonly aria-label="Ссылка на комнату" />
+            <button id="copyInviteBtn" class="secondary-btn" type="button">Копировать</button>
+          </div>
+        </div>
+
         <p id="status" class="status">Ход: X</p>
         <div id="resultBanner" class="result-banner hidden"></div>
 
-        <section class="scoreboard" aria-label="Счёт">
+        <section id="scoreboard" class="scoreboard" aria-label="Счёт">
           <div class="score-box x-box">
             <span>Крестики</span>
             <strong id="scoreX">0</strong>
@@ -103,6 +131,7 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="config.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
