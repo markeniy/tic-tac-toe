@@ -82,6 +82,7 @@ let onlinePlayerSymbol = "";
 let onlineState = null;
 let onlineResultSignature = "";
 let onlineVariant = "standard";
+let onlineRemovalTimeoutId = 0;
 
 let scoreX = 0;
 let scoreO = 0;
@@ -394,6 +395,10 @@ function leaveOnlineRoom(options = {}) {
   onlinePlayerSymbol = "";
   onlineState = null;
   onlineResultSignature = "";
+  if (onlineRemovalTimeoutId) {
+    window.clearTimeout(onlineRemovalTimeoutId);
+    onlineRemovalTimeoutId = 0;
+  }
 
   const url = new URL(window.location.href);
   url.searchParams.delete("room");
@@ -523,7 +528,10 @@ async function handleOnlineMove(index) {
     current_player: nextPlayer,
     winner: null,
     winning_pattern: [],
-    status: "playing"
+    status: "playing",
+    score_x: onlineState?.score_x ?? 0,
+    score_o: onlineState?.score_o ?? 0,
+    score_draw: onlineState?.score_draw ?? 0
   };
 
   if (!winnerData && !draw && isChaosMode()) {
@@ -541,9 +549,15 @@ async function handleOnlineMove(index) {
     patch.winner = winnerData.player;
     patch.winning_pattern = winnerData.pattern;
     patch.status = "finished";
+    if (winnerData.player === "X") {
+      patch.score_x += 1;
+    } else {
+      patch.score_o += 1;
+    }
   } else if (draw) {
     patch.winner = "draw";
     patch.status = "finished";
+    patch.score_draw += 1;
   }
 
   const { data, error } = await supabase
@@ -716,26 +730,63 @@ function finishGameWithDraw() {
 }
 
 function applyOnlineState(room) {
+  const previousBoard = board.slice();
   onlineState = room;
   onlineVariant = room.board_size === 4 ? "chaos" : "standard";
   gameMode = getOnlineGameMode(room);
   boardSize = room.board_size || 3;
   winPatterns = buildStandardWinPatterns(boardSize);
   chaosPatterns = isChaosMode() ? buildChaosPatterns(boardSize) : [];
-  board = Array.isArray(room.board) ? room.board : createEmptyBoard(boardSize);
+  const nextBoard = Array.isArray(room.board) ? room.board : createEmptyBoard(boardSize);
+  const removedIndex = getOnlineRemovedCellIndex(previousBoard, nextBoard);
+  board = nextBoard;
   currentPlayer = room.current_player || "X";
   gameActive = room.status === "playing";
   aiThinking = false;
   boardLocked = false;
 
+  if (onlineRemovalTimeoutId) {
+    window.clearTimeout(onlineRemovalTimeoutId);
+    onlineRemovalTimeoutId = 0;
+  }
+
   if (cells.length !== board.length) {
     createBoardCells();
   } else {
+    if (removedIndex !== -1) {
+      const previewBoard = board.slice();
+      previewBoard[removedIndex] = "";
+      board = previewBoard;
+      renderBoard();
+      boardLocked = true;
+      updateBoardState();
+
+      const cell = cells[removedIndex];
+      if (cell) {
+        cell.classList.add("removing");
+        playSound("block");
+      }
+
+      onlineRemovalTimeoutId = window.setTimeout(() => {
+        onlineRemovalTimeoutId = 0;
+        board = nextBoard;
+        boardLocked = false;
+        renderBoard();
+        finalizeOnlineStateUi(room);
+      }, 650);
+      return;
+    }
+
     renderBoard();
   }
 
+  finalizeOnlineStateUi(room);
+}
+
+function finalizeOnlineStateUi(room) {
   hideModal();
   hideResultBanner();
+  updateScoreUI();
   updateStatus();
   updateBoardState();
 
@@ -792,6 +843,13 @@ function highlightWinner(pattern) {
 }
 
 function updateScoreUI() {
+  if (isOnlineMode() && onlineState) {
+    scoreXText.textContent = String(onlineState.score_x ?? 0);
+    scoreOText.textContent = String(onlineState.score_o ?? 0);
+    scoreDrawText.textContent = String(onlineState.score_draw ?? 0);
+    return;
+  }
+
   scoreXText.textContent = String(scoreX);
   scoreOText.textContent = String(scoreO);
   scoreDrawText.textContent = String(scoreDraw);
@@ -974,7 +1032,7 @@ function updateActionButtons() {
 }
 
 function updateScoreboardVisibility() {
-  scoreboard.classList.toggle("hidden", isOnlineMode());
+  scoreboard.classList.remove("hidden");
 }
 
 function updateOnlineRoomPanel() {
@@ -1806,6 +1864,20 @@ function getRemovableEmptyCellsForBoard(nextBoard, size) {
     .filter((index) => index !== null);
 
   return edgeCells.length > 0 ? edgeCells : emptyCells;
+}
+
+function getOnlineRemovedCellIndex(previousBoard, nextBoard) {
+  if (!isChaosMode() || previousBoard.length !== nextBoard.length) {
+    return -1;
+  }
+
+  for (let index = 0; index < nextBoard.length; index += 1) {
+    if (previousBoard[index] === "" && nextBoard[index] === "blocked") {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
 function persistOnlineRole(roomCode, role) {
