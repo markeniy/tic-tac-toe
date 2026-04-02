@@ -448,9 +448,11 @@ body[data-theme="light"] .share-input {
 }
 
 .top-bar {
-  display: flex;
-  justify-content: flex-start;
-  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .top-actions {
@@ -468,10 +470,6 @@ body[data-theme="light"] .share-input {
   backdrop-filter: blur(10px);
   justify-self: stretch;
   justify-content: stretch;
-}
-
-.top-actions-bottom {
-  margin-top: 16px;
 }
 
 .mode-label {
@@ -818,8 +816,9 @@ body[data-theme="light"] .score-box:hover {
 
 .cell {
   aspect-ratio: 1 / 1;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 22px;
   background:
@@ -831,7 +830,7 @@ body[data-theme="light"] .score-box:hover {
   color: var(--text);
   font-size: clamp(42px, 10vw, 58px);
   font-weight: 900;
-  line-height: 1;
+  line-height: 0.9;
   cursor: pointer;
   transition:
     transform 0.22s var(--ease-smooth),
@@ -841,6 +840,7 @@ body[data-theme="light"] .score-box:hover {
     filter 0.22s var(--ease-smooth);
   position: relative;
   overflow: hidden;
+  padding: 0 0 4px;
 }
 
 .cell:hover:not(:disabled) {
@@ -1376,7 +1376,8 @@ body[data-theme="light"] .result-banner {
   }
 
   .top-bar {
-    justify-content: flex-start;
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .header-row {
