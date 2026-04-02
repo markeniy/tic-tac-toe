@@ -448,11 +448,9 @@ body[data-theme="light"] .share-input {
 }
 
 .top-bar {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 18px;
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 14px;
 }
 
 .top-actions {
@@ -470,6 +468,10 @@ body[data-theme="light"] .share-input {
   backdrop-filter: blur(10px);
   justify-self: stretch;
   justify-content: stretch;
+}
+
+.top-actions-bottom {
+  margin-top: 16px;
 }
 
 .mode-label {
@@ -1340,8 +1342,7 @@ body[data-theme="light"] .result-banner {
   }
 
   .top-bar {
-    grid-template-columns: 1fr;
-    align-items: stretch;
+    justify-content: flex-start;
   }
 
   .header-row {

@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const menuScreen = document.getElementById("menuScreen");
 const gameScreen = document.getElementById("gameScreen");
 
@@ -87,8 +85,10 @@ const ANNOUNCER_STREAKS = [
 ];
 const SUPABASE_CONFIG = window.TIC_TAC_TOE_CONFIG || {};
 const hasSupabaseConfig = Boolean(SUPABASE_CONFIG.supabaseUrl && SUPABASE_CONFIG.supabaseAnonKey);
+const supabaseFactory = window.supabase?.createClient || null;
 const supabase = hasSupabaseConfig
-  ? createClient(SUPABASE_CONFIG.supabaseUrl, SUPABASE_CONFIG.supabaseAnonKey)
+  && supabaseFactory
+  ? supabaseFactory(SUPABASE_CONFIG.supabaseUrl, SUPABASE_CONFIG.supabaseAnonKey)
   : null;
 
 let cells = [];
