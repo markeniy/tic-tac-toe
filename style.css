@@ -17,6 +17,9 @@
   --button-text: #1a1410;
   --card-radius: 30px;
   --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --tg-viewport-height: 100vh;
+  --safe-top: 0px;
+  --safe-bottom: 0px;
 }
 
 body[data-theme="light"] {
@@ -44,7 +47,7 @@ body[data-theme="light"] {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: var(--tg-viewport-height);
   font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text);
   background:
@@ -66,12 +69,22 @@ body[data-theme="light"] {
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: var(--tg-viewport-height);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: calc(24px + var(--safe-top)) 24px calc(24px + var(--safe-bottom));
   position: relative;
   overflow: hidden;
+}
+
+body.telegram-mini-app .app-shell {
+  padding-top: calc(16px + var(--safe-top));
+  padding-bottom: calc(18px + var(--safe-bottom));
+}
+
+body.telegram-mini-app .card {
+  width: min(100%, 500px);
+  border-radius: 28px;
 }
 
 .app-shell::before,

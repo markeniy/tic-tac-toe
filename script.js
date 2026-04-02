@@ -60,10 +60,12 @@ const resultModal = document.getElementById("resultModal");
 const resultTitle = document.getElementById("resultTitle");
 const resultText = document.getElementById("resultText");
 const playAgainBtn = document.getElementById("playAgainBtn");
+const telegramWebApp = window.Telegram?.WebApp || null;
 
 const ONLINE_STORAGE_KEY = "ticTacToeOnlineRoles";
 const STREAK_STORAGE_KEY = "ticTacToeStreaks";
 const ONLINE_ROOM_TTL_MS = 30 * 60 * 1000;
+const TELEGRAM_BOT_USERNAME = "markeniy_tictactoe_bot";
 const ANNOUNCER_VOICE_ENABLED = false;
 const ANNOUNCER_AUDIO_BASE = "./assets/announcer";
 const ANNOUNCER_AUDIO_VOLUME = 0.7;
@@ -129,6 +131,7 @@ gameScreen.insertBefore(streakToast, scoreboard);
 
 loadScores();
 loadStreaks();
+setupTelegramMiniApp();
 updateScoreUI();
 applyTheme();
 updateSoundButton();
@@ -207,6 +210,7 @@ function startGame(mode) {
   updateActionButtons();
   updateScoreboardVisibility();
   updateOnlineRoomPanel();
+  syncTelegramBackButton();
   resetBoard();
 }
 
@@ -250,6 +254,8 @@ function openFlowScreen(screen, options = {}) {
   if (screen === "ai-difficulty") {
     syncDifficultyButtons();
   }
+
+  syncTelegramBackButton();
 }
 
 function goBackFlowScreen() {
@@ -273,6 +279,7 @@ function closeFlowModal() {
   flowHistory = [];
   flowBackBtn.classList.add("hidden");
   clearOnlinePanelMessage();
+  syncTelegramBackButton();
 }
 
 function startComputerGame(level) {
@@ -438,8 +445,7 @@ function subscribeToOnlineRoom(roomCode) {
 }
 
 async function tryJoinRoomFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const roomCode = normalizeRoomCode(params.get("room") || "");
+  const roomCode = getRequestedRoomCode();
   if (!roomCode) {
     return;
   }
@@ -479,6 +485,7 @@ function goToMenu() {
   closeFlowModal();
   hideModal();
   hideResultBanner();
+  syncTelegramBackButton();
 }
 
 function leaveOnlineRoom(options = {}) {
@@ -1424,7 +1431,8 @@ function updateOnlineRoomPanel() {
   playerBadge.textContent = onlineVariant === "chaos"
     ? `Ты играешь за: ${onlinePlayerSymbol} · 4x4 хаос`
     : `Ты играешь за: ${onlinePlayerSymbol} · 3x3`;
-  shareLinkInput.value = `${window.location.origin}${window.location.pathname}?room=${onlineRoomCode}`;
+  shareLinkInput.value = getRoomInviteLink(onlineRoomCode);
+  copyInviteBtn.textContent = isTelegramMiniApp() ? "Пригласить" : "Копировать";
 }
 
 function updateOnlineSetupHint() {
@@ -2027,11 +2035,13 @@ function showModal(title, text) {
   resultText.textContent = text;
   resultModal.classList.remove("hidden");
   resultModal.setAttribute("aria-hidden", "false");
+  syncTelegramBackButton();
 }
 
 function hideModal() {
   resultModal.classList.add("hidden");
   resultModal.setAttribute("aria-hidden", "true");
+  syncTelegramBackButton();
 }
 
 function showResultBanner(text) {
@@ -2047,6 +2057,16 @@ function hideResultBanner() {
 function playSound(type) {
   if (!soundEnabled) {
     return;
+  }
+
+  if (type === "moveX" || type === "moveO") {
+    triggerTelegramHaptic("light");
+  } else if (type === "win" || type === "streak") {
+    triggerTelegramHaptic("medium");
+  } else if (type === "draw" || type === "block") {
+    triggerTelegramHaptic("soft");
+  } else if (type === "toggle") {
+    triggerTelegramHaptic("rigid");
   }
 
   const context = getAudioContext();
@@ -2206,12 +2226,191 @@ async function copyInviteLink() {
     return;
   }
 
+  if (isTelegramMiniApp()) {
+    const shareText = encodeURIComponent("Залетай в комнату и сыграй со мной в крестики-нолики.");
+    const inviteUrl = encodeURIComponent(shareLinkInput.value);
+    const shareUrl = `https://t.me/share/url?url=${inviteUrl}&text=${shareText}`;
+
+    try {
+      telegramWebApp.openTelegramLink?.(shareUrl);
+    } catch (error) {
+      window.open(shareUrl, "_blank", "noopener,noreferrer");
+    }
+
+    showResultBanner("Открыл Telegram-приглашение.");
+    return;
+  }
+
   try {
     await navigator.clipboard.writeText(shareLinkInput.value);
     showResultBanner("Ссылка скопирована.");
   } catch (error) {
     shareLinkInput.select();
     showResultBanner("Скопируй ссылку вручную из поля.");
+  }
+}
+
+function isTelegramMiniApp() {
+  return Boolean(telegramWebApp && telegramWebApp.initData !== undefined);
+}
+
+function getTelegramStartParam() {
+  const params = new URLSearchParams(window.location.search);
+  const rawParam = telegramWebApp?.initDataUnsafe?.start_param
+    || params.get("tgWebAppStartParam")
+    || params.get("startapp")
+    || "";
+  return String(rawParam || "").trim();
+}
+
+function getTelegramRoomInviteLink(roomCode) {
+  const normalizedCode = normalizeRoomCode(roomCode);
+  return `https://t.me/${TELEGRAM_BOT_USERNAME}?startapp=room_${normalizedCode}`;
+}
+
+function getRoomInviteLink(roomCode) {
+  if (isTelegramMiniApp()) {
+    return getTelegramRoomInviteLink(roomCode);
+  }
+
+  return `${window.location.origin}${window.location.pathname}?room=${normalizeRoomCode(roomCode)}`;
+}
+
+function getRequestedRoomCode() {
+  const params = new URLSearchParams(window.location.search);
+  const roomFromQuery = normalizeRoomCode(params.get("room") || "");
+  if (roomFromQuery) {
+    return roomFromQuery;
+  }
+
+  const startParam = getTelegramStartParam();
+  if (/^room_/i.test(startParam)) {
+    return normalizeRoomCode(startParam.replace(/^room_/i, ""));
+  }
+
+  return "";
+}
+
+function setupTelegramMiniApp() {
+  if (!isTelegramMiniApp()) {
+    syncViewportHeight();
+    window.addEventListener("resize", syncViewportHeight);
+    return;
+  }
+
+  document.body.classList.add("telegram-mini-app");
+  syncViewportHeight();
+  applyTelegramTheme();
+
+  try {
+    telegramWebApp.ready();
+    telegramWebApp.expand();
+    if (typeof telegramWebApp.disableVerticalSwipes === "function") {
+      telegramWebApp.disableVerticalSwipes();
+    }
+    telegramWebApp.setHeaderColor?.("secondary_bg_color");
+    telegramWebApp.setBackgroundColor?.(telegramWebApp.themeParams?.bg_color || "#0d0d12");
+  } catch (error) {
+    // Ignore Telegram-specific setup issues and keep the app usable in browser mode.
+  }
+
+  telegramWebApp.onEvent?.("themeChanged", applyTelegramTheme);
+  telegramWebApp.onEvent?.("viewportChanged", syncViewportHeight);
+  telegramWebApp.BackButton.onClick(handleTelegramBack);
+  syncTelegramBackButton();
+}
+
+function syncViewportHeight() {
+  const viewportHeight = isTelegramMiniApp()
+    ? `${telegramWebApp.viewportStableHeight || telegramWebApp.viewportHeight || window.innerHeight}px`
+    : `${window.innerHeight}px`;
+  document.documentElement.style.setProperty("--tg-viewport-height", viewportHeight);
+}
+
+function applyTelegramTheme() {
+  if (!isTelegramMiniApp()) {
+    return;
+  }
+
+  const params = telegramWebApp.themeParams || {};
+  const colorScheme = telegramWebApp.colorScheme || "dark";
+
+  if (!localStorage.getItem("ticTacToeTheme")) {
+    currentTheme = colorScheme === "light" ? "light" : "dark";
+    applyTheme();
+  }
+
+  if (params.bg_color) {
+    document.documentElement.style.setProperty("--bg-top", params.bg_color);
+  }
+
+  if (params.secondary_bg_color) {
+    document.documentElement.style.setProperty("--bg-bottom", params.secondary_bg_color);
+    document.documentElement.style.setProperty("--panel", params.secondary_bg_color);
+  }
+
+  if (params.text_color) {
+    document.documentElement.style.setProperty("--text", params.text_color);
+  }
+
+  if (params.hint_color) {
+    document.documentElement.style.setProperty("--muted", params.hint_color);
+  }
+
+  if (params.button_color) {
+    document.documentElement.style.setProperty("--accent", params.button_color);
+  }
+
+  if (params.button_text_color) {
+    document.documentElement.style.setProperty("--button-text", params.button_text_color);
+  }
+}
+
+function syncTelegramBackButton() {
+  if (!isTelegramMiniApp()) {
+    return;
+  }
+
+  const shouldShow = gameScreen.classList.contains("active")
+    || !flowModal.classList.contains("hidden")
+    || !resultModal.classList.contains("hidden");
+
+  if (shouldShow) {
+    telegramWebApp.BackButton.show();
+  } else {
+    telegramWebApp.BackButton.hide();
+  }
+}
+
+function handleTelegramBack() {
+  if (!resultModal.classList.contains("hidden")) {
+    hideModal();
+    return;
+  }
+
+  if (!flowModal.classList.contains("hidden")) {
+    if (flowHistory.length > 0) {
+      goBackFlowScreen();
+      return;
+    }
+    closeFlowModal();
+    return;
+  }
+
+  if (gameScreen.classList.contains("active")) {
+    goToMenu();
+  }
+}
+
+function triggerTelegramHaptic(style = "light") {
+  if (!isTelegramMiniApp()) {
+    return;
+  }
+
+  try {
+    telegramWebApp.HapticFeedback?.impactOccurred(style);
+  } catch (error) {
+    // Haptics are optional.
   }
 }
 
