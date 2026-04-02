@@ -6,6 +6,7 @@ const gameScreen = document.getElementById("gameScreen");
 const twoPlayersBtn = document.getElementById("twoPlayersBtn");
 const aiModeBtn = document.getElementById("aiModeBtn");
 const onlineModeBtn = document.getElementById("onlineModeBtn");
+const tgShareAppBtn = document.getElementById("tgShareAppBtn");
 const flowModal = document.getElementById("flowModal");
 const flowBackBtn = document.getElementById("flowBackBtn");
 const flowCloseBtn = document.getElementById("flowCloseBtn");
@@ -139,6 +140,7 @@ applyDifficulty();
 updateOnlineSetupHint();
 applyOnlineVariantButtons();
 primeAnnouncerVoices();
+updateTelegramEntryPoint();
 
 if (topActions && themeToggleBtnGame && modeLabel) {
   topActions.insertBefore(themeToggleBtnGame, modeLabel);
@@ -147,6 +149,7 @@ if (topActions && themeToggleBtnGame && modeLabel) {
 twoPlayersBtn.addEventListener("click", () => openFlowScreen("local-mode"));
 aiModeBtn.addEventListener("click", () => openFlowScreen("ai-mode"));
 onlineModeBtn.addEventListener("click", () => openFlowScreen("online-entry"));
+tgShareAppBtn.addEventListener("click", shareTelegramMiniApp);
 flowBackBtn.addEventListener("click", goBackFlowScreen);
 flowCloseBtn.addEventListener("click", closeFlowModal);
 flowLocalStandardBtn.addEventListener("click", () => {
@@ -212,6 +215,14 @@ function startGame(mode) {
   updateOnlineRoomPanel();
   syncTelegramBackButton();
   resetBoard();
+}
+
+function updateTelegramEntryPoint() {
+  if (!tgShareAppBtn) {
+    return;
+  }
+
+  tgShareAppBtn.classList.toggle("hidden", !isTelegramMiniApp());
 }
 
 function openFlowScreen(screen, options = {}) {
@@ -1339,6 +1350,7 @@ function playAnnouncerAudio(filename) {
 function toggleTheme() {
   currentTheme = currentTheme === "dark" ? "light" : "dark";
   applyTheme();
+  syncTelegramChromeColors();
   localStorage.setItem("ticTacToeTheme", currentTheme);
   playSound("toggle");
 }
@@ -2237,7 +2249,7 @@ async function copyInviteLink() {
       window.open(shareUrl, "_blank", "noopener,noreferrer");
     }
 
-    showResultBanner("Открыл Telegram-приглашение.");
+    showResultBanner("Выбери чат в Telegram и отправь приглашение.");
     return;
   }
 
@@ -2248,6 +2260,24 @@ async function copyInviteLink() {
     shareLinkInput.select();
     showResultBanner("Скопируй ссылку вручную из поля.");
   }
+}
+
+function shareTelegramMiniApp() {
+  if (!isTelegramMiniApp()) {
+    return;
+  }
+
+  const appUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?startapp`;
+  const shareText = encodeURIComponent("Залетай, тут очень стильные крестики-нолики и онлайн с другом.");
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${shareText}`;
+
+  try {
+    telegramWebApp.openTelegramLink?.(shareUrl);
+  } catch (error) {
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  }
+
+  showResultBanner("Выбери чат в Telegram и поделись игрой.");
 }
 
 function isTelegramMiniApp() {
@@ -2308,8 +2338,7 @@ function setupTelegramMiniApp() {
     if (typeof telegramWebApp.disableVerticalSwipes === "function") {
       telegramWebApp.disableVerticalSwipes();
     }
-    telegramWebApp.setHeaderColor?.("secondary_bg_color");
-    telegramWebApp.setBackgroundColor?.(telegramWebApp.themeParams?.bg_color || "#0d0d12");
+    syncTelegramChromeColors();
   } catch (error) {
     // Ignore Telegram-specific setup issues and keep the app usable in browser mode.
   }
@@ -2331,38 +2360,29 @@ function applyTelegramTheme() {
   if (!isTelegramMiniApp()) {
     return;
   }
+  document.documentElement.style.removeProperty("--bg-top");
+  document.documentElement.style.removeProperty("--bg-bottom");
+  document.documentElement.style.removeProperty("--panel");
+  document.documentElement.style.removeProperty("--text");
+  document.documentElement.style.removeProperty("--muted");
+  document.documentElement.style.removeProperty("--accent");
+  document.documentElement.style.removeProperty("--button-text");
+  syncTelegramChromeColors();
+}
 
-  const params = telegramWebApp.themeParams || {};
-  const colorScheme = telegramWebApp.colorScheme || "dark";
-
-  if (!localStorage.getItem("ticTacToeTheme")) {
-    currentTheme = colorScheme === "light" ? "light" : "dark";
-    applyTheme();
+function syncTelegramChromeColors() {
+  if (!isTelegramMiniApp()) {
+    return;
   }
 
-  if (params.bg_color) {
-    document.documentElement.style.setProperty("--bg-top", params.bg_color);
-  }
+  const backgroundColor = currentTheme === "light" ? "#fff8ea" : "#0d0d12";
+  const headerColor = currentTheme === "light" ? "#ffe8d3" : "#1b1024";
 
-  if (params.secondary_bg_color) {
-    document.documentElement.style.setProperty("--bg-bottom", params.secondary_bg_color);
-    document.documentElement.style.setProperty("--panel", params.secondary_bg_color);
-  }
-
-  if (params.text_color) {
-    document.documentElement.style.setProperty("--text", params.text_color);
-  }
-
-  if (params.hint_color) {
-    document.documentElement.style.setProperty("--muted", params.hint_color);
-  }
-
-  if (params.button_color) {
-    document.documentElement.style.setProperty("--accent", params.button_color);
-  }
-
-  if (params.button_text_color) {
-    document.documentElement.style.setProperty("--button-text", params.button_text_color);
+  try {
+    telegramWebApp.setBackgroundColor?.(backgroundColor);
+    telegramWebApp.setHeaderColor?.(headerColor);
+  } catch (error) {
+    // Keep the app usable even if Telegram chrome colors fail.
   }
 }
 
