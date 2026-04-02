@@ -30,52 +30,15 @@
         </div>
 
         <div class="menu-buttons">
-          <button id="twoPlayersBtn" type="button">Играть вдвоём</button>
-          <button id="aiModeBtn" type="button">Играть против компьютера</button>
-          <button id="onlineModeBtn" class="secondary-btn" type="button">Играть онлайн</button>
-        </div>
-
-        <div id="variantPicker" class="variant-picker hidden" aria-label="Выбор варианта игры">
-          <p id="variantPickerTitle" class="difficulty-title">Выберите вариант</p>
-          <div class="variant-buttons">
-            <button id="standardVariantBtn" type="button">3x3 стандарт</button>
-            <button id="chaosVariantBtn" class="secondary-btn" type="button">4x4 хаос</button>
-          </div>
-          <div id="pickerDifficultyPanel" class="difficulty-panel hidden" aria-label="Выбор сложности бота">
-            <p class="difficulty-title">Сложность бота</p>
-            <div class="difficulty-buttons">
-              <button id="easyDifficultyBtn" class="difficulty-btn active" type="button">Лёгкий</button>
-              <button id="mediumDifficultyBtn" class="difficulty-btn" type="button">Средний</button>
-              <button id="hardDifficultyBtn" class="difficulty-btn" type="button">Сложный</button>
-            </div>
-          </div>
-          <button id="startAiVariantBtn" class="hidden" type="button">Начать игру с ботом</button>
-          <button id="closeVariantPickerBtn" class="ghost-btn" type="button">Отмена</button>
-        </div>
-
-        <div id="onlinePanel" class="variant-picker hidden" aria-label="Онлайн игра">
-          <p class="difficulty-title">Онлайн режим</p>
-          <p class="panel-copy">Создайте комнату и отправьте другу код или ссылку. Ничего ставить не нужно.</p>
-          <div class="variant-buttons">
-            <button id="onlineStandardVariantBtn" type="button">Онлайн 3x3</button>
-            <button id="onlineChaosVariantBtn" class="secondary-btn" type="button">Онлайн 4x4 хаос</button>
-          </div>
-          <div class="menu-buttons">
-            <button id="createRoomBtn" type="button">Создать комнату</button>
-          </div>
-          <div class="join-room-row">
-            <input id="roomCodeInput" class="code-input" type="text" maxlength="6" placeholder="Код комнаты" autocomplete="off" />
-            <button id="joinRoomBtn" class="secondary-btn" type="button">Войти</button>
-          </div>
-          <p id="onlineConfigHint" class="setup-hint hidden">Нужно заполнить `config.js` данными Supabase, тогда онлайн заработает.</p>
-          <p id="onlinePanelMessage" class="panel-message hidden"></p>
-          <button id="closeOnlinePanelBtn" class="ghost-btn" type="button">Отмена</button>
+          <button id="twoPlayersBtn" type="button">Локально вдвоём</button>
+          <button id="aiModeBtn" type="button">С ботом</button>
+          <button id="onlineModeBtn" class="secondary-btn" type="button">Онлайн с другом</button>
         </div>
       </div>
 
       <div id="gameScreen" class="screen">
         <div class="top-bar">
-          <button id="backBtn" class="secondary-btn" type="button">Назад</button>
+          <button id="backBtn" class="secondary-btn back-icon-btn" type="button" aria-label="Назад">←</button>
           <div class="top-actions">
             <button id="soundToggleBtn" class="icon-btn" type="button">Звук: вкл</button>
             <div id="difficultyBadge" class="mode-label"></div>
@@ -135,6 +98,73 @@
       <h2 id="resultTitle">Победа!</h2>
       <p id="resultText">Игрок X победил</p>
       <button id="playAgainBtn" type="button">Играть ещё</button>
+    </div>
+  </div>
+
+  <div id="flowModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-content flow-modal">
+      <div class="flow-head">
+        <button id="flowBackBtn" class="ghost-btn hidden" type="button">Назад</button>
+        <button id="flowCloseBtn" class="ghost-btn" type="button">Закрыть</button>
+      </div>
+
+      <div id="flowLocalModeScreen" class="flow-screen hidden">
+        <h2>Локальная игра</h2>
+        <p>Выберите формат партии для игры на одном устройстве.</p>
+        <div class="variant-buttons">
+          <button id="flowLocalStandardBtn" type="button">Классика 3x3</button>
+          <button id="flowLocalChaosBtn" class="secondary-btn" type="button">Хаос 4x4</button>
+        </div>
+      </div>
+
+      <div id="flowAiModeScreen" class="flow-screen hidden">
+        <h2>Режим с ботом</h2>
+        <p>Сначала выберите поле, потом зададим характер соперника.</p>
+        <div class="variant-buttons">
+          <button id="flowAiStandardBtn" type="button">Классика 3x3</button>
+          <button id="flowAiChaosBtn" class="secondary-btn" type="button">Хаос 4x4</button>
+        </div>
+      </div>
+
+      <div id="flowAiDifficultyScreen" class="flow-screen hidden">
+        <h2>Сложность бота</h2>
+        <p>Выберите темп и жёсткость соперника.</p>
+        <div class="difficulty-buttons">
+          <button id="flowEasyDifficultyBtn" class="difficulty-btn" type="button">Лёгкий</button>
+          <button id="flowMediumDifficultyBtn" class="difficulty-btn" type="button">Средний</button>
+          <button id="flowHardDifficultyBtn" class="difficulty-btn" type="button">Сложный</button>
+        </div>
+      </div>
+
+      <div id="flowOnlineEntryScreen" class="flow-screen hidden">
+        <h2>Онлайн с другом</h2>
+        <p>Создайте комнату или подключитесь по коду приглашения.</p>
+        <div class="variant-buttons">
+          <button id="flowOnlineCreateBtn" type="button">Создать комнату</button>
+          <button id="flowOnlineJoinStepBtn" class="secondary-btn" type="button">Ввести код</button>
+        </div>
+        <p id="onlineConfigHint" class="setup-hint hidden">Нужно заполнить `config.js` данными Supabase, тогда онлайн заработает.</p>
+      </div>
+
+      <div id="flowOnlineVariantScreen" class="flow-screen hidden">
+        <h2>Формат комнаты</h2>
+        <p>Выберите режим, который откроется у вас и у друга.</p>
+        <div class="variant-buttons">
+          <button id="onlineStandardVariantBtn" type="button">Классика 3x3</button>
+          <button id="onlineChaosVariantBtn" class="secondary-btn" type="button">Хаос 4x4</button>
+        </div>
+        <button id="createRoomBtn" type="button">Создать и открыть комнату</button>
+      </div>
+
+      <div id="flowOnlineJoinScreen" class="flow-screen hidden">
+        <h2>Подключение по коду</h2>
+        <p>Введите код комнаты, который прислал друг.</p>
+        <div class="join-room-row">
+          <input id="roomCodeInput" class="code-input" type="text" maxlength="6" placeholder="Код комнаты" autocomplete="off" />
+          <button id="joinRoomBtn" class="secondary-btn" type="button">Подключиться</button>
+        </div>
+        <p id="onlinePanelMessage" class="panel-message hidden"></p>
+      </div>
     </div>
   </div>
 

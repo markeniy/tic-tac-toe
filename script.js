@@ -6,20 +6,29 @@ const gameScreen = document.getElementById("gameScreen");
 const twoPlayersBtn = document.getElementById("twoPlayersBtn");
 const aiModeBtn = document.getElementById("aiModeBtn");
 const onlineModeBtn = document.getElementById("onlineModeBtn");
-const variantPicker = document.getElementById("variantPicker");
-const variantPickerTitle = document.getElementById("variantPickerTitle");
-const standardVariantBtn = document.getElementById("standardVariantBtn");
-const chaosVariantBtn = document.getElementById("chaosVariantBtn");
-const pickerDifficultyPanel = document.getElementById("pickerDifficultyPanel");
-const startAiVariantBtn = document.getElementById("startAiVariantBtn");
-const closeVariantPickerBtn = document.getElementById("closeVariantPickerBtn");
-const onlinePanel = document.getElementById("onlinePanel");
+const flowModal = document.getElementById("flowModal");
+const flowBackBtn = document.getElementById("flowBackBtn");
+const flowCloseBtn = document.getElementById("flowCloseBtn");
+const flowLocalModeScreen = document.getElementById("flowLocalModeScreen");
+const flowAiModeScreen = document.getElementById("flowAiModeScreen");
+const flowAiDifficultyScreen = document.getElementById("flowAiDifficultyScreen");
+const flowOnlineEntryScreen = document.getElementById("flowOnlineEntryScreen");
+const flowOnlineVariantScreen = document.getElementById("flowOnlineVariantScreen");
+const flowOnlineJoinScreen = document.getElementById("flowOnlineJoinScreen");
+const flowLocalStandardBtn = document.getElementById("flowLocalStandardBtn");
+const flowLocalChaosBtn = document.getElementById("flowLocalChaosBtn");
+const flowAiStandardBtn = document.getElementById("flowAiStandardBtn");
+const flowAiChaosBtn = document.getElementById("flowAiChaosBtn");
+const flowEasyDifficultyBtn = document.getElementById("flowEasyDifficultyBtn");
+const flowMediumDifficultyBtn = document.getElementById("flowMediumDifficultyBtn");
+const flowHardDifficultyBtn = document.getElementById("flowHardDifficultyBtn");
+const flowOnlineCreateBtn = document.getElementById("flowOnlineCreateBtn");
+const flowOnlineJoinStepBtn = document.getElementById("flowOnlineJoinStepBtn");
 const onlineStandardVariantBtn = document.getElementById("onlineStandardVariantBtn");
 const onlineChaosVariantBtn = document.getElementById("onlineChaosVariantBtn");
 const createRoomBtn = document.getElementById("createRoomBtn");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
-const closeOnlinePanelBtn = document.getElementById("closeOnlinePanelBtn");
 const onlineConfigHint = document.getElementById("onlineConfigHint");
 const onlinePanelMessage = document.getElementById("onlinePanelMessage");
 const backBtn = document.getElementById("backBtn");
@@ -28,9 +37,7 @@ const resetAllBtn = document.getElementById("resetAllBtn");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const themeToggleBtnGame = document.getElementById("themeToggleBtnGame");
 const soundToggleBtn = document.getElementById("soundToggleBtn");
-const easyDifficultyBtn = document.getElementById("easyDifficultyBtn");
-const mediumDifficultyBtn = document.getElementById("mediumDifficultyBtn");
-const hardDifficultyBtn = document.getElementById("hardDifficultyBtn");
+const topActions = document.querySelector(".top-actions");
 const onlineRoomPanel = document.getElementById("onlineRoomPanel");
 const roomCodeBadge = document.getElementById("roomCodeBadge");
 const playerBadge = document.getElementById("playerBadge");
@@ -69,8 +76,7 @@ let currentPlayer = "X";
 let gameActive = false;
 let gameMode = "pvp";
 let aiThinking = false;
-let pendingMenuMode = null;
-let pendingVariant = null;
+let pendingAiVariant = "standard";
 let boardLocked = false;
 let currentTheme = localStorage.getItem("ticTacToeTheme") || "dark";
 let soundEnabled = localStorage.getItem("ticTacToeSound") !== "off";
@@ -83,6 +89,8 @@ let onlineState = null;
 let onlineResultSignature = "";
 let onlineVariant = "standard";
 let onlineRemovalTimeoutId = 0;
+let activeFlowScreen = "";
+let flowHistory = [];
 
 let scoreX = 0;
 let scoreO = 0;
@@ -96,16 +104,38 @@ applyDifficulty();
 updateOnlineSetupHint();
 applyOnlineVariantButtons();
 
-twoPlayersBtn.addEventListener("click", () => openVariantPicker("pvp"));
-aiModeBtn.addEventListener("click", () => openVariantPicker("ai"));
-onlineModeBtn.addEventListener("click", openOnlinePanel);
-standardVariantBtn.addEventListener("click", () => startSelectedVariant("standard"));
-chaosVariantBtn.addEventListener("click", () => startSelectedVariant("chaos"));
-startAiVariantBtn.addEventListener("click", startComputerVariant);
-closeVariantPickerBtn.addEventListener("click", closeVariantPicker);
+if (topActions && themeToggleBtnGame && modeLabel) {
+  topActions.insertBefore(themeToggleBtnGame, modeLabel);
+}
+
+twoPlayersBtn.addEventListener("click", () => openFlowScreen("local-mode"));
+aiModeBtn.addEventListener("click", () => openFlowScreen("ai-mode"));
+onlineModeBtn.addEventListener("click", () => openFlowScreen("online-entry"));
+flowBackBtn.addEventListener("click", goBackFlowScreen);
+flowCloseBtn.addEventListener("click", closeFlowModal);
+flowLocalStandardBtn.addEventListener("click", () => {
+  closeFlowModal();
+  startGame("pvp");
+});
+flowLocalChaosBtn.addEventListener("click", () => {
+  closeFlowModal();
+  startGame("chaos");
+});
+flowAiStandardBtn.addEventListener("click", () => {
+  pendingAiVariant = "standard";
+  openFlowScreen("ai-difficulty", { pushHistory: true });
+});
+flowAiChaosBtn.addEventListener("click", () => {
+  pendingAiVariant = "chaos";
+  openFlowScreen("ai-difficulty", { pushHistory: true });
+});
+flowEasyDifficultyBtn.addEventListener("click", () => startComputerGame("easy"));
+flowMediumDifficultyBtn.addEventListener("click", () => startComputerGame("medium"));
+flowHardDifficultyBtn.addEventListener("click", () => startComputerGame("hard"));
+flowOnlineCreateBtn.addEventListener("click", () => openFlowScreen("online-variant", { pushHistory: true }));
+flowOnlineJoinStepBtn.addEventListener("click", () => openFlowScreen("online-join", { pushHistory: true }));
 createRoomBtn.addEventListener("click", createOnlineRoom);
 joinRoomBtn.addEventListener("click", joinOnlineRoom);
-closeOnlinePanelBtn.addEventListener("click", closeOnlinePanel);
 onlineStandardVariantBtn.addEventListener("click", () => setOnlineVariant("standard"));
 onlineChaosVariantBtn.addEventListener("click", () => setOnlineVariant("chaos"));
 roomCodeInput.addEventListener("input", () => {
@@ -117,9 +147,6 @@ resetAllBtn.addEventListener("click", handleSecondaryAction);
 themeToggleBtn.addEventListener("click", toggleTheme);
 themeToggleBtnGame.addEventListener("click", toggleTheme);
 soundToggleBtn.addEventListener("click", toggleSound);
-easyDifficultyBtn.addEventListener("click", () => setDifficulty("easy"));
-mediumDifficultyBtn.addEventListener("click", () => setDifficulty("medium"));
-hardDifficultyBtn.addEventListener("click", () => setDifficulty("hard"));
 playAgainBtn.addEventListener("click", () => {
   hideModal();
   if (isOnlineMode()) {
@@ -150,62 +177,75 @@ function startGame(mode) {
   resetBoard();
 }
 
-function openVariantPicker(baseMode) {
-  pendingMenuMode = baseMode;
-  pendingVariant = null;
-  closeOnlinePanel();
-  variantPickerTitle.textContent = "Выберите вариант";
-  pickerDifficultyPanel.classList.add("hidden");
-  startAiVariantBtn.classList.add("hidden");
-  variantPicker.classList.remove("hidden");
-}
+function openFlowScreen(screen, options = {}) {
+  const screens = {
+    "local-mode": flowLocalModeScreen,
+    "ai-mode": flowAiModeScreen,
+    "ai-difficulty": flowAiDifficultyScreen,
+    "online-entry": flowOnlineEntryScreen,
+    "online-variant": flowOnlineVariantScreen,
+    "online-join": flowOnlineJoinScreen
+  };
 
-function closeVariantPicker() {
-  pendingMenuMode = null;
-  pendingVariant = null;
-  variantPickerTitle.textContent = "Выберите вариант";
-  pickerDifficultyPanel.classList.add("hidden");
-  startAiVariantBtn.classList.add("hidden");
-  variantPicker.classList.add("hidden");
-}
+  if (!screens[screen]) {
+    return;
+  }
 
-function openOnlinePanel() {
-  closeVariantPicker();
+  if (options.resetHistory) {
+    flowHistory = [];
+  } else if (options.pushHistory && activeFlowScreen) {
+    flowHistory.push(activeFlowScreen);
+  }
+
+  activeFlowScreen = screen;
+  Object.values(screens).forEach((node) => node.classList.add("hidden"));
+  screens[screen].classList.remove("hidden");
+  flowBackBtn.classList.toggle("hidden", flowHistory.length === 0);
   clearOnlinePanelMessage();
-  roomCodeInput.value = "";
-  applyOnlineVariantButtons();
-  onlinePanel.classList.remove("hidden");
+  onlineConfigHint.classList.toggle("hidden", hasSupabaseConfig || screen !== "online-entry");
+  flowModal.classList.remove("hidden");
+  flowModal.setAttribute("aria-hidden", "false");
+
+  if (screen === "online-entry" || screen === "online-join") {
+    roomCodeInput.value = roomCodeInput.value || "";
+  }
+
+  if (screen === "online-variant") {
+    applyOnlineVariantButtons();
+  }
+
+  if (screen === "ai-difficulty") {
+    syncDifficultyButtons();
+  }
 }
 
-function closeOnlinePanel() {
-  onlinePanel.classList.add("hidden");
+function goBackFlowScreen() {
+  if (flowHistory.length === 0) {
+    closeFlowModal();
+    return;
+  }
+
+  const history = flowHistory.slice();
+  const previousScreen = history.pop();
+  flowHistory = history;
+  openFlowScreen(previousScreen, { resetHistory: true });
+  flowHistory = history;
+  flowBackBtn.classList.toggle("hidden", flowHistory.length === 0);
+}
+
+function closeFlowModal() {
+  flowModal.classList.add("hidden");
+  flowModal.setAttribute("aria-hidden", "true");
+  activeFlowScreen = "";
+  flowHistory = [];
+  flowBackBtn.classList.add("hidden");
   clearOnlinePanelMessage();
 }
 
-function startSelectedVariant(variant) {
-  if (!pendingMenuMode) {
-    return;
-  }
-
-  if (pendingMenuMode === "pvp") {
-    startGame(variant === "chaos" ? "chaos" : "pvp");
-    closeVariantPicker();
-    return;
-  }
-
-  pendingVariant = variant;
-  variantPickerTitle.textContent = "Выберите вариант и сложность";
-  pickerDifficultyPanel.classList.remove("hidden");
-  startAiVariantBtn.classList.remove("hidden");
-}
-
-function startComputerVariant() {
-  if (pendingMenuMode !== "ai" || !pendingVariant) {
-    return;
-  }
-
-  startGame(pendingVariant === "chaos" ? "chaos-ai" : "ai");
-  closeVariantPicker();
+function startComputerGame(level) {
+  setDifficulty(level);
+  closeFlowModal();
+  startGame(pendingAiVariant === "chaos" ? "chaos-ai" : "ai");
 }
 
 async function createOnlineRoom() {
@@ -237,7 +277,7 @@ async function createOnlineRoom() {
   }
 
   persistOnlineRole(roomCode, "X");
-  closeOnlinePanel();
+  closeFlowModal();
   await startOnlineSession(data, "X");
 }
 
@@ -289,7 +329,7 @@ async function joinOnlineRoom() {
 
       persistOnlineRole(roomCode, "O");
       assignedRole = "O";
-      closeOnlinePanel();
+      closeFlowModal();
       await startOnlineSession(joinedRoom, assignedRole);
       return;
     }
@@ -298,7 +338,7 @@ async function joinOnlineRoom() {
     return;
   }
 
-  closeOnlinePanel();
+  closeFlowModal();
   await startOnlineSession(room, assignedRole);
 }
 
@@ -365,7 +405,7 @@ async function tryJoinRoomFromUrl() {
   }
 
   roomCodeInput.value = roomCode;
-  openOnlinePanel();
+  openFlowScreen("online-join", { resetHistory: true });
   await joinOnlineRoom();
 }
 
@@ -379,8 +419,7 @@ function goToMenu() {
   boardLocked = false;
   gameScreen.classList.remove("active");
   menuScreen.classList.add("active");
-  closeVariantPicker();
-  closeOnlinePanel();
+  closeFlowModal();
   hideModal();
   hideResultBanner();
 }
@@ -993,10 +1032,14 @@ function setDifficulty(level) {
 }
 
 function applyDifficulty() {
-  easyDifficultyBtn.classList.toggle("active", botDifficulty === "easy");
-  mediumDifficultyBtn.classList.toggle("active", botDifficulty === "medium");
-  hardDifficultyBtn.classList.toggle("active", botDifficulty === "hard");
+  syncDifficultyButtons();
   updateDifficultyBadge();
+}
+
+function syncDifficultyButtons() {
+  flowEasyDifficultyBtn.classList.toggle("active", botDifficulty === "easy");
+  flowMediumDifficultyBtn.classList.toggle("active", botDifficulty === "medium");
+  flowHardDifficultyBtn.classList.toggle("active", botDifficulty === "hard");
 }
 
 function updateDifficultyBadge() {
@@ -1670,39 +1713,35 @@ function playSound(type) {
   const now = context.currentTime;
 
   if (type === "moveX") {
-    tone(context, 392, now, 0.08, "triangle", 0.05);
-    tone(context, 523.25, now + 0.04, 0.1, "triangle", 0.03);
+    tapSound(context, now, 980, 0.024, 0.032);
     return;
   }
 
   if (type === "moveO") {
-    tone(context, 261.63, now, 0.09, "sine", 0.05);
-    tone(context, 329.63, now + 0.05, 0.11, "sine", 0.03);
+    tapSound(context, now, 840, 0.026, 0.033);
     return;
   }
 
   if (type === "block") {
-    tone(context, 196, now, 0.06, "square", 0.04);
-    tone(context, 146.83, now + 0.04, 0.08, "square", 0.03);
+    tapSound(context, now, 520, 0.036, 0.022);
     return;
   }
 
   if (type === "win") {
-    tone(context, 392, now, 0.12, "triangle", 0.05);
-    tone(context, 523.25, now + 0.08, 0.14, "triangle", 0.04);
-    tone(context, 659.25, now + 0.16, 0.18, "triangle", 0.03);
+    tapSound(context, now, 760, 0.03, 0.026);
+    tapSound(context, now + 0.055, 980, 0.04, 0.026);
+    tone(context, 1244.51, now + 0.1, 0.2, "triangle", 0.018, 2600);
     return;
   }
 
   if (type === "draw") {
-    tone(context, 280, now, 0.1, "sine", 0.045);
-    tone(context, 240, now + 0.08, 0.13, "sine", 0.04);
+    tapSound(context, now, 660, 0.03, 0.018);
+    tone(context, 560, now + 0.05, 0.16, "triangle", 0.014, 1800);
     return;
   }
 
   if (type === "toggle") {
-    tone(context, 440, now, 0.06, "square", 0.03);
-    tone(context, 660, now + 0.04, 0.08, "square", 0.02);
+    tapSound(context, now, 900, 0.02, 0.018);
   }
 }
 
@@ -1719,22 +1758,33 @@ function getAudioContext() {
   return audioContext;
 }
 
-function tone(context, frequency, startTime, duration, waveType, volume) {
+function tone(context, frequency, startTime, duration, waveType, volume, cutoff = 3200) {
   const oscillator = context.createOscillator();
   const gainNode = context.createGain();
+  const filterNode = context.createBiquadFilter();
 
   oscillator.type = waveType;
   oscillator.frequency.setValueAtTime(frequency, startTime);
+  filterNode.type = "lowpass";
+  filterNode.frequency.setValueAtTime(cutoff, startTime);
+  filterNode.Q.setValueAtTime(1.1, startTime);
 
   gainNode.gain.setValueAtTime(0.0001, startTime);
-  gainNode.gain.exponentialRampToValueAtTime(volume, startTime + 0.01);
+  gainNode.gain.exponentialRampToValueAtTime(volume, startTime + 0.004);
   gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
-  oscillator.connect(gainNode);
+  oscillator.connect(filterNode);
+  filterNode.connect(gainNode);
   gainNode.connect(context.destination);
 
   oscillator.start(startTime);
-  oscillator.stop(startTime + duration + 0.02);
+  oscillator.stop(startTime + duration + 0.04);
+}
+
+function tapSound(context, startTime, frequency, duration, volume) {
+  tone(context, frequency, startTime, duration, "triangle", volume, 3400);
+  tone(context, frequency * 0.52, startTime + 0.001, duration * 0.95, "sine", volume * 0.46, 2200);
+  tone(context, frequency * 1.9, startTime, duration * 0.3, "square", volume * 0.18, 5000);
 }
 
 function handleNewRound() {
