@@ -44,6 +44,7 @@ const playerBadge = document.getElementById("playerBadge");
 const shareLinkInput = document.getElementById("shareLinkInput");
 const copyInviteBtn = document.getElementById("copyInviteBtn");
 const scoreboard = document.getElementById("scoreboard");
+const scoreLabels = scoreboard ? scoreboard.querySelectorAll(".score-box span") : [];
 
 const boardNode = document.getElementById("board");
 const statusText = document.getElementById("status");
@@ -61,6 +62,23 @@ const resultText = document.getElementById("resultText");
 const playAgainBtn = document.getElementById("playAgainBtn");
 
 const ONLINE_STORAGE_KEY = "ticTacToeOnlineRoles";
+const STREAK_STORAGE_KEY = "ticTacToeStreaks";
+const ONLINE_ROOM_TTL_MS = 30 * 60 * 1000;
+const ANNOUNCER_VOICE_ENABLED = false;
+const ANNOUNCER_AUDIO_BASE = "./assets/announcer";
+const ANNOUNCER_STREAKS = [
+  null,
+  null,
+  { title: "DOUBLE KILL", speech: "Double kill", file: "double-kill.mp3" },
+  { title: "TRIPLE KILL", speech: "Triple kill", file: "triple-kill.mp3" },
+  { title: "QUADRA KILL", speech: "Quadra kill", file: "quadra-kill.mp3" },
+  { title: "RAMPAGE", speech: "Rampage", file: "rampage.mp3" },
+  { title: "DOMINATING", speech: "Dominating", file: "dominating.mp3" },
+  { title: "UNSTOPPABLE", speech: "Unstoppable", file: "unstoppable.mp3" },
+  { title: "MONSTER KILL", speech: "Monster kill", file: "monster-kill.mp3" },
+  { title: "GODLIKE", speech: "Godlike", file: "godlike.mp3" },
+  { title: "IMMORTAL", speech: "Immortal", file: "immortal.mp3" }
+];
 const SUPABASE_CONFIG = window.TIC_TAC_TOE_CONFIG || {};
 const hasSupabaseConfig = Boolean(SUPABASE_CONFIG.supabaseUrl && SUPABASE_CONFIG.supabaseAnonKey);
 const supabase = hasSupabaseConfig
@@ -95,14 +113,26 @@ let flowHistory = [];
 let scoreX = 0;
 let scoreO = 0;
 let scoreDraw = 0;
+let winStreak = 0;
+let unbeatenStreak = 0;
+let streakToastTimeoutId = 0;
+let announcerVoice = null;
+const announcerAudio = new Map();
+
+const streakToast = document.createElement("div");
+streakToast.id = "streakToast";
+streakToast.className = "streak-toast hidden";
+gameScreen.insertBefore(streakToast, scoreboard);
 
 loadScores();
+loadStreaks();
 updateScoreUI();
 applyTheme();
 updateSoundButton();
 applyDifficulty();
 updateOnlineSetupHint();
 applyOnlineVariantButtons();
+primeAnnouncerVoices();
 
 if (topActions && themeToggleBtnGame && modeLabel) {
   topActions.insertBefore(themeToggleBtnGame, modeLabel);
@@ -307,6 +337,13 @@ async function joinOnlineRoom() {
     return;
   }
 
+  if (isOnlineRoomExpired(room)) {
+    clearPendingRoomLink();
+    clearSavedOnlineRole(roomCode);
+    setOnlinePanelMessage("Срок комнаты истёк. Создай новую комнату.");
+    return;
+  }
+
   const savedRole = getSavedOnlineRole(roomCode);
   let assignedRole = savedRole;
 
@@ -409,6 +446,23 @@ async function tryJoinRoomFromUrl() {
   await joinOnlineRoom();
 }
 
+function getOnlineRoomTimestamp(room) {
+  const source = room?.updated_at || room?.created_at || "";
+  const timestamp = Date.parse(source);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isOnlineRoomExpired(room) {
+  const timestamp = getOnlineRoomTimestamp(room);
+  return !timestamp || Date.now() - timestamp > ONLINE_ROOM_TTL_MS;
+}
+
+function clearPendingRoomLink() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url);
+}
+
 function goToMenu() {
   if (isOnlineMode()) {
     leaveOnlineRoom();
@@ -504,6 +558,10 @@ function handleCellClick(index) {
 
   const winnerData = getWinner();
   if (winnerData) {
+    if (winnerData.player === "draw") {
+      finishGameWithDraw(winnerData.pattern);
+      return;
+    }
     finishGameWithWinner(winnerData);
     return;
   }
@@ -517,6 +575,10 @@ function handleCellClick(index) {
     removeRandomEmptyCell(() => {
       const chaosWinner = getWinner();
       if (chaosWinner) {
+        if (chaosWinner.player === "draw") {
+          finishGameWithDraw(chaosWinner.pattern);
+          return;
+        }
         finishGameWithWinner(chaosWinner);
         return;
       }
@@ -553,6 +615,13 @@ async function handleOnlineMove(index) {
     return;
   }
 
+  if (isOnlineRoomExpired(onlineState)) {
+    showResultBanner("Комната истекла из-за неактивности. Создай новую.");
+    leaveOnlineRoom();
+    goToMenu();
+    return;
+  }
+
   boardLocked = true;
   updateBoardState();
 
@@ -585,13 +654,18 @@ async function handleOnlineMove(index) {
   }
 
   if (winnerData) {
-    patch.winner = winnerData.player;
     patch.winning_pattern = winnerData.pattern;
     patch.status = "finished";
-    if (winnerData.player === "X") {
-      patch.score_x += 1;
+    if (winnerData.player === "draw") {
+      patch.winner = "draw";
+      patch.score_draw += 1;
     } else {
-      patch.score_o += 1;
+      patch.winner = winnerData.player;
+      if (winnerData.player === "X") {
+        patch.score_x += 1;
+      } else {
+        patch.score_o += 1;
+      }
     }
   } else if (draw) {
     patch.winner = "draw";
@@ -736,6 +810,7 @@ function finishGameWithWinner(winnerData) {
   updateScoreUI();
   updateBoardState();
   saveScores();
+  handleTrackedOutcome(winnerData.player === "X" ? "win" : "loss");
 
   let resultMessage = `Игрок ${winnerData.player} победил`;
   if (isComputerMode() && winnerData.player === "O") {
@@ -751,15 +826,19 @@ function finishGameWithWinner(winnerData) {
   showResultBanner(resultMessage);
 }
 
-function finishGameWithDraw() {
+function finishGameWithDraw(highlightPattern = []) {
   gameActive = false;
   aiThinking = false;
   statusText.textContent = "Ничья";
   playSound("draw");
   scoreDraw += 1;
   updateScoreUI();
+  if (Array.isArray(highlightPattern) && highlightPattern.length > 0) {
+    highlightWinner(highlightPattern);
+  }
   updateBoardState();
   saveScores();
+  handleTrackedOutcome("draw");
 
   const text = isChaosMode()
     ? "Свободных клеток больше не осталось"
@@ -843,9 +922,13 @@ function finalizeOnlineStateUi(room) {
 
     if (room.winner === "draw") {
       statusText.textContent = "Ничья";
+      if (Array.isArray(room.winning_pattern)) {
+        highlightWinner(room.winning_pattern);
+      }
       showResultBanner("Матч завершился вничью.");
       if (onlineResultSignature !== resultSignature) {
         playSound("draw");
+        handleTrackedOutcome("draw");
       }
       onlineResultSignature = resultSignature;
       return;
@@ -865,6 +948,7 @@ function finalizeOnlineStateUi(room) {
     );
     if (onlineResultSignature !== resultSignature) {
       playSound("win");
+      handleTrackedOutcome(room.winner === onlinePlayerSymbol ? "win" : "loss");
     }
     onlineResultSignature = resultSignature;
     return;
@@ -883,15 +967,46 @@ function highlightWinner(pattern) {
 
 function updateScoreUI() {
   if (isOnlineMode() && onlineState) {
-    scoreXText.textContent = String(onlineState.score_x ?? 0);
-    scoreOText.textContent = String(onlineState.score_o ?? 0);
+    updateScoreLabels();
+    if (onlinePlayerSymbol === "O") {
+      scoreXText.textContent = String(onlineState.score_o ?? 0);
+      scoreOText.textContent = String(onlineState.score_x ?? 0);
+    } else {
+      scoreXText.textContent = String(onlineState.score_x ?? 0);
+      scoreOText.textContent = String(onlineState.score_o ?? 0);
+    }
     scoreDrawText.textContent = String(onlineState.score_draw ?? 0);
     return;
   }
 
+  updateScoreLabels();
   scoreXText.textContent = String(scoreX);
   scoreOText.textContent = String(scoreO);
   scoreDrawText.textContent = String(scoreDraw);
+}
+
+function updateScoreLabels() {
+  if (!scoreLabels.length) {
+    return;
+  }
+
+  if (isOnlineMode()) {
+    scoreLabels[0].textContent = "Ты";
+    scoreLabels[1].textContent = "Соперник";
+    scoreLabels[2].textContent = "Ничьи";
+    return;
+  }
+
+  if (isComputerMode()) {
+    scoreLabels[0].textContent = "Ты";
+    scoreLabels[1].textContent = "Бот";
+    scoreLabels[2].textContent = "Ничьи";
+    return;
+  }
+
+  scoreLabels[0].textContent = "Крестики";
+  scoreLabels[1].textContent = "Нолики";
+  scoreLabels[2].textContent = "Ничьи";
 }
 
 function updateStatus() {
@@ -992,6 +1107,190 @@ function loadScores() {
     scoreX = 0;
     scoreO = 0;
     scoreDraw = 0;
+  }
+}
+
+function loadStreaks() {
+  const saved = localStorage.getItem(STREAK_STORAGE_KEY);
+  if (!saved) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    winStreak = parsed.winStreak || 0;
+    unbeatenStreak = parsed.unbeatenStreak || 0;
+  } catch (error) {
+    winStreak = 0;
+    unbeatenStreak = 0;
+  }
+}
+
+function saveStreaks() {
+  localStorage.setItem(
+    STREAK_STORAGE_KEY,
+    JSON.stringify({
+      winStreak,
+      unbeatenStreak
+    })
+  );
+}
+
+function shouldTrackStreaks() {
+  return isComputerMode() || isOnlineMode();
+}
+
+function handleTrackedOutcome(outcome) {
+  if (!shouldTrackStreaks()) {
+    return;
+  }
+
+  if (outcome === "win") {
+    winStreak += 1;
+    unbeatenStreak += 1;
+  } else if (outcome === "draw") {
+    winStreak = 0;
+    unbeatenStreak += 1;
+  } else {
+    winStreak = 0;
+    unbeatenStreak = 0;
+  }
+
+  saveStreaks();
+
+  if (outcome === "loss") {
+    return;
+  }
+
+  if (winStreak >= 2) {
+    const announcerEvent = getAnnouncerStreak(winStreak);
+    showStreakToast(announcerEvent.title, `Серия побед x${winStreak}`);
+    playSound("streak");
+    announceStreak(announcerEvent);
+    return;
+  }
+
+  if (unbeatenStreak >= 3) {
+    showStreakToast("NO DEFEAT", `Без поражений x${unbeatenStreak}`);
+    playSound("streak");
+  }
+}
+
+function getAnnouncerStreak(streak) {
+  if (streak < ANNOUNCER_STREAKS.length && ANNOUNCER_STREAKS[streak]) {
+    return ANNOUNCER_STREAKS[streak];
+  }
+
+  return {
+    title: `LEGENDARY x${streak}`,
+    speech: `Legendary ${streak}`,
+    file: "legendary.mp3"
+  };
+}
+
+function showStreakToast(title, subtitle = "") {
+  if (!streakToast) {
+    return;
+  }
+
+  if (streakToastTimeoutId) {
+    window.clearTimeout(streakToastTimeoutId);
+  }
+
+  streakToast.innerHTML = `
+    <strong class="streak-toast-title">${title}</strong>
+    <span class="streak-toast-subtitle">${subtitle}</span>
+  `;
+  streakToast.classList.remove("hidden", "show");
+  void streakToast.offsetWidth;
+  streakToast.classList.add("show");
+
+  streakToastTimeoutId = window.setTimeout(() => {
+    streakToast.classList.remove("show");
+    streakToast.classList.add("hidden");
+    streakToastTimeoutId = 0;
+  }, 2200);
+}
+
+function primeAnnouncerVoices() {
+  if (!("speechSynthesis" in window)) {
+    return;
+  }
+
+  const assignVoice = () => {
+    announcerVoice = pickAnnouncerVoice(window.speechSynthesis.getVoices());
+  };
+
+  assignVoice();
+  window.speechSynthesis.addEventListener("voiceschanged", assignVoice, { once: true });
+}
+
+function pickAnnouncerVoice(voices) {
+  if (!Array.isArray(voices) || voices.length === 0) {
+    return null;
+  }
+
+  const preferredPatterns = [
+    /google us english/i,
+    /microsoft david/i,
+    /microsoft mark/i,
+    /en-us/i,
+    /english/i
+  ];
+
+  for (const pattern of preferredPatterns) {
+    const voice = voices.find((entry) => pattern.test(`${entry.name} ${entry.lang}`));
+    if (voice) {
+      return voice;
+    }
+  }
+
+  return voices[0] || null;
+}
+
+function announceStreak(announcerEvent) {
+  if (announcerEvent?.file && playAnnouncerAudio(announcerEvent.file)) {
+    return;
+  }
+
+  const text = announcerEvent?.speech || "";
+  if (!ANNOUNCER_VOICE_ENABLED || !soundEnabled || !("speechSynthesis" in window) || !text) {
+    return;
+  }
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = announcerVoice?.lang || "en-US";
+    utterance.voice = announcerVoice;
+    utterance.rate = 0.92;
+    utterance.pitch = 0.78;
+    utterance.volume = 1;
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    // Ignore announcer failures and keep gameplay uninterrupted.
+  }
+}
+
+function playAnnouncerAudio(filename) {
+  if (!soundEnabled || !filename) {
+    return false;
+  }
+
+  let audio = announcerAudio.get(filename);
+  if (!audio) {
+    audio = new Audio(`${ANNOUNCER_AUDIO_BASE}/${filename}`);
+    audio.preload = "auto";
+    announcerAudio.set(filename, audio);
+  }
+
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+    void audio.play().catch(() => {});
+    return true;
+  } catch (error) {
+    return false;
   }
 }
 
@@ -1509,6 +1808,8 @@ function buildDiagonalPatterns(size, minLength) {
 }
 
 function getChaosWinnerForBoard(nextBoard) {
+  const winners = [];
+
   for (const pattern of chaosPatterns) {
     const compressedEntries = pattern.cells
       .map((index) => ({ index, value: nextBoard[index] }))
@@ -1516,11 +1817,23 @@ function getChaosWinnerForBoard(nextBoard) {
 
     const winner = getWinningStreakFromCompressedLine(compressedEntries, pattern.minLength);
     if (winner) {
-      return winner;
+      winners.push(winner);
     }
   }
 
-  return null;
+  if (winners.length === 0) {
+    return null;
+  }
+
+  const uniquePlayers = [...new Set(winners.map((winner) => winner.player))];
+  if (uniquePlayers.length > 1) {
+    return {
+      player: "draw",
+      pattern: [...new Set(winners.flatMap((winner) => winner.pattern))]
+    };
+  }
+
+  return winners[0];
 }
 
 function getWinningStreakFromCompressedLine(compressedEntries, minLength) {
@@ -1723,7 +2036,9 @@ function playSound(type) {
   }
 
   if (type === "block") {
-    tapSound(context, now, 520, 0.036, 0.022);
+    tone(context, 1420, now, 0.028, "triangle", 0.016, 4200);
+    tone(context, 980, now + 0.012, 0.04, "sine", 0.012, 2600);
+    tone(context, 1960, now + 0.004, 0.02, "square", 0.006, 5200);
     return;
   }
 
@@ -1742,6 +2057,13 @@ function playSound(type) {
 
   if (type === "toggle") {
     tapSound(context, now, 900, 0.02, 0.018);
+    return;
+  }
+
+  if (type === "streak") {
+    tapSound(context, now, 760, 0.024, 0.022);
+    tapSound(context, now + 0.055, 980, 0.028, 0.024);
+    tone(context, 1320, now + 0.11, 0.11, "triangle", 0.016, 3000);
   }
 }
 
@@ -1807,6 +2129,13 @@ function handleSecondaryAction() {
 
 async function resetOnlineRoom() {
   if (!supabase || !onlineRoomCode || !onlineState || onlineState.status === "waiting") {
+    return;
+  }
+
+  if (isOnlineRoomExpired(onlineState)) {
+    showResultBanner("Комната истекла из-за неактивности. Создай новую.");
+    leaveOnlineRoom();
+    goToMenu();
     return;
   }
 
@@ -1939,6 +2268,16 @@ function persistOnlineRole(roomCode, role) {
 function getSavedOnlineRole(roomCode) {
   const stored = JSON.parse(localStorage.getItem(ONLINE_STORAGE_KEY) || "{}");
   return stored[roomCode] || "";
+}
+
+function clearSavedOnlineRole(roomCode) {
+  const stored = JSON.parse(localStorage.getItem(ONLINE_STORAGE_KEY) || "{}");
+  if (!(roomCode in stored)) {
+    return;
+  }
+
+  delete stored[roomCode];
+  localStorage.setItem(ONLINE_STORAGE_KEY, JSON.stringify(stored));
 }
 
 function isOnlineMode() {
