@@ -2239,7 +2239,7 @@ async function copyInviteLink() {
   }
 
   if (isTelegramMiniApp()) {
-    const shareText = encodeURIComponent("Залетай в комнату и сыграй со мной в крестики-нолики.");
+    const shareText = encodeURIComponent("Заходи, создал комнату в крестики-нолики. В таком режиме тебе выиграть меня без шансов)00)");
     const inviteUrl = encodeURIComponent(shareLinkInput.value);
     const shareUrl = `https://t.me/share/url?url=${inviteUrl}&text=${shareText}`;
 
@@ -2268,7 +2268,7 @@ function shareTelegramMiniApp() {
   }
 
   const appUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?startapp`;
-  const shareText = encodeURIComponent("Залетай, тут очень стильные крестики-нолики и онлайн с другом.");
+  const shareText = encodeURIComponent("Заходи, создал комнату в крестики-нолики. В таком режиме тебе выиграть меня без шансов)00)");
   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${shareText}`;
 
   try {
