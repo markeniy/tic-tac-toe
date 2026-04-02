@@ -819,9 +819,8 @@ body[data-theme="light"] .score-box:hover {
 
 .cell {
   aspect-ratio: 1 / 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   border: none;
   border-radius: 22px;
   background:
@@ -831,10 +830,9 @@ body[data-theme="light"] .score-box:hover {
     inset 0 0 0 1px rgba(212, 175, 55, 0.12),
     0 16px 28px rgba(0, 0, 0, 0.22);
   color: var(--text);
-  font-family: "Unbounded", "Manrope", sans-serif;
   font-size: clamp(42px, 10vw, 58px);
   font-weight: 900;
-  line-height: 0.82;
+  line-height: 1;
   cursor: pointer;
   transition:
     transform 0.22s var(--ease-smooth),
@@ -844,7 +842,7 @@ body[data-theme="light"] .score-box:hover {
     filter 0.22s var(--ease-smooth);
   position: relative;
   overflow: hidden;
-  padding: 0 0 6px;
+  padding: 0 0 2px;
 }
 
 .cell:hover:not(:disabled) {
