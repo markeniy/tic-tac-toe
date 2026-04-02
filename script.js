@@ -113,8 +113,10 @@ let flowHistory = [];
 let scoreX = 0;
 let scoreO = 0;
 let scoreDraw = 0;
-let winStreak = 0;
-let unbeatenStreak = 0;
+let streakState = {
+  X: { win: 0, unbeaten: 0 },
+  O: { win: 0, unbeaten: 0 }
+};
 let streakToastTimeoutId = 0;
 let announcerVoice = null;
 const announcerAudio = new Map();
@@ -810,7 +812,7 @@ function finishGameWithWinner(winnerData) {
   updateScoreUI();
   updateBoardState();
   saveScores();
-  handleTrackedOutcome(winnerData.player === "X" ? "win" : "loss");
+  handleTrackedOutcome("win", winnerData.player);
 
   let resultMessage = `Игрок ${winnerData.player} победил`;
   if (isComputerMode() && winnerData.player === "O") {
@@ -948,7 +950,7 @@ function finalizeOnlineStateUi(room) {
     );
     if (onlineResultSignature !== resultSignature) {
       playSound("win");
-      handleTrackedOutcome(room.winner === onlinePlayerSymbol ? "win" : "loss");
+      handleTrackedOutcome("win", room.winner);
     }
     onlineResultSignature = resultSignature;
     return;
@@ -1118,21 +1120,28 @@ function loadStreaks() {
 
   try {
     const parsed = JSON.parse(saved);
-    winStreak = parsed.winStreak || 0;
-    unbeatenStreak = parsed.unbeatenStreak || 0;
+    streakState = {
+      X: {
+        win: parsed?.X?.win || 0,
+        unbeaten: parsed?.X?.unbeaten || 0
+      },
+      O: {
+        win: parsed?.O?.win || 0,
+        unbeaten: parsed?.O?.unbeaten || 0
+      }
+    };
   } catch (error) {
-    winStreak = 0;
-    unbeatenStreak = 0;
+    streakState = {
+      X: { win: 0, unbeaten: 0 },
+      O: { win: 0, unbeaten: 0 }
+    };
   }
 }
 
 function saveStreaks() {
   localStorage.setItem(
     STREAK_STORAGE_KEY,
-    JSON.stringify({
-      winStreak,
-      unbeatenStreak
-    })
+    JSON.stringify(streakState)
   );
 }
 
@@ -1140,38 +1149,61 @@ function shouldTrackStreaks() {
   return isComputerMode() || isOnlineMode();
 }
 
-function handleTrackedOutcome(outcome) {
+function getStreakOwnerLabel(player) {
+  if (isOnlineMode()) {
+    return player === onlinePlayerSymbol ? "Ты" : "Соперник";
+  }
+
+  if (isComputerMode()) {
+    return player === "X" ? "Ты" : "Бот";
+  }
+
+  return player === "X" ? "Крестики" : "Нолики";
+}
+
+function handleTrackedOutcome(outcome, winner = "") {
   if (!shouldTrackStreaks()) {
     return;
   }
 
-  if (outcome === "win") {
-    winStreak += 1;
-    unbeatenStreak += 1;
+  if (outcome === "win" && (winner === "X" || winner === "O")) {
+    const loser = winner === "X" ? "O" : "X";
+    streakState[winner].win += 1;
+    streakState[winner].unbeaten += 1;
+    streakState[loser].win = 0;
+    streakState[loser].unbeaten = 0;
   } else if (outcome === "draw") {
-    winStreak = 0;
-    unbeatenStreak += 1;
+    streakState.X.win = 0;
+    streakState.O.win = 0;
+    streakState.X.unbeaten += 1;
+    streakState.O.unbeaten += 1;
   } else {
-    winStreak = 0;
-    unbeatenStreak = 0;
+    streakState.X.win = 0;
+    streakState.X.unbeaten = 0;
+    streakState.O.win = 0;
+    streakState.O.unbeaten = 0;
   }
 
   saveStreaks();
 
-  if (outcome === "loss") {
+  if (outcome === "loss" || (winner !== "X" && winner !== "O")) {
     return;
   }
 
+  const winStreak = streakState[winner].win;
+  const unbeatenStreak = streakState[winner].unbeaten;
+  const ownerLabel = getStreakOwnerLabel(winner);
+
   if (winStreak >= 2) {
     const announcerEvent = getAnnouncerStreak(winStreak);
-    showStreakToast(announcerEvent.title, `Серия побед x${winStreak}`);
+    showStreakToast(announcerEvent.title, `${ownerLabel} · серия x${winStreak}`);
     playSound("streak");
     announceStreak(announcerEvent);
     return;
   }
 
   if (unbeatenStreak >= 3) {
-    showStreakToast("NO DEFEAT", `Без поражений x${unbeatenStreak}`);
+    showStreakToast("NO DEFEAT", `${ownerLabel} · без поражений x${unbeatenStreak}`);
     playSound("streak");
   }
 }
