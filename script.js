@@ -40,6 +40,8 @@ const topActions = document.querySelector(".top-actions");
 const onlineRoomPanel = document.getElementById("onlineRoomPanel");
 const roomCodeBadge = document.getElementById("roomCodeBadge");
 const playerBadge = document.getElementById("playerBadge");
+const onlineRoomPanelBody = document.getElementById("onlineRoomPanelBody");
+const toggleRoomPanelBtn = document.getElementById("toggleRoomPanelBtn");
 const shareLinkInput = document.getElementById("shareLinkInput");
 const copyInviteBtn = document.getElementById("copyInviteBtn");
 const copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
@@ -115,6 +117,7 @@ let onlineVariant = "standard";
 let onlineRemovalTimeoutId = 0;
 let activeFlowScreen = "";
 let flowHistory = [];
+let isOnlineRoomPanelCollapsed = false;
 
 let scoreX = 0;
 let scoreO = 0;
@@ -199,6 +202,7 @@ playAgainBtn.addEventListener("click", () => {
 copyInviteBtn.addEventListener("click", copyInviteLink);
 copyRoomCodeBtn.addEventListener("click", copyRoomCode);
 telegramInviteBtn.addEventListener("click", shareTelegramRoomInvite);
+toggleRoomPanelBtn.addEventListener("click", toggleOnlineRoomPanel);
 
 if (hasSupabaseConfig) {
   void tryJoinRoomFromUrl();
@@ -934,10 +938,17 @@ function finalizeOnlineStateUi(room) {
   updateBoardState();
 
   if (room.status === "waiting") {
+    isOnlineRoomPanelCollapsed = false;
+    updateOnlineRoomPanel();
     onlineResultSignature = "";
     statusText.textContent = "Ждём второго игрока. Отправь другу код комнаты.";
     showResultBanner("Комната создана. Второй игрок может зайти по коду или ссылке.");
     return;
+  }
+
+  if (!isOnlineRoomPanelCollapsed && room.status === "playing") {
+    isOnlineRoomPanelCollapsed = true;
+    updateOnlineRoomPanel();
   }
 
   if (room.status === "finished") {
@@ -1450,6 +1461,8 @@ function updateOnlineRoomPanel() {
   shareLinkInput.value = getWebRoomInviteLink(onlineRoomCode);
   copyInviteBtn.textContent = "Копировать ссылку";
   telegramInviteBtn.classList.toggle("hidden", !isTelegramMiniApp());
+  onlineRoomPanel.classList.toggle("collapsed", isOnlineRoomPanelCollapsed);
+  toggleRoomPanelBtn.textContent = isOnlineRoomPanelCollapsed ? "Показать" : "Скрыть";
 }
 
 function updateOnlineSetupHint() {
@@ -1463,6 +1476,11 @@ function setOnlinePanelMessage(text) {
 
 function clearOnlinePanelMessage() {
   setOnlinePanelMessage("");
+}
+
+function toggleOnlineRoomPanel() {
+  isOnlineRoomPanelCollapsed = !isOnlineRoomPanelCollapsed;
+  updateOnlineRoomPanel();
 }
 
 function getDifficultyLabel() {

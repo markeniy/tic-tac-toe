@@ -52,17 +52,23 @@
         </div>
 
         <div id="onlineRoomPanel" class="online-room-panel hidden">
+          <div class="online-room-head">
+            <span class="online-room-title">Детали комнаты</span>
+            <button id="toggleRoomPanelBtn" class="ghost-btn room-panel-toggle" type="button">Скрыть</button>
+          </div>
           <div class="online-room-copy">
             <span id="roomCodeBadge" class="hero-chip">Комната</span>
             <span id="playerBadge" class="hero-chip">Игрок</span>
           </div>
-          <div class="online-room-actions">
-            <input id="shareLinkInput" class="share-input" type="text" readonly aria-label="Ссылка на комнату" />
-            <button id="copyInviteBtn" class="secondary-btn" type="button">Копировать ссылку</button>
-          </div>
-          <div class="online-room-secondary-actions">
-            <button id="copyRoomCodeBtn" class="ghost-btn" type="button">Копировать код</button>
-            <button id="telegramInviteBtn" class="ghost-btn hidden" type="button">Пригласить в Telegram</button>
+          <div id="onlineRoomPanelBody" class="online-room-body">
+            <div class="online-room-actions">
+              <input id="shareLinkInput" class="share-input" type="text" readonly aria-label="Ссылка на комнату" />
+              <button id="copyInviteBtn" class="secondary-btn" type="button">Копировать ссылку</button>
+            </div>
+            <div class="online-room-secondary-actions">
+              <button id="copyRoomCodeBtn" class="ghost-btn" type="button">Копировать код</button>
+              <button id="telegramInviteBtn" class="ghost-btn hidden" type="button">Пригласить в Telegram</button>
+            </div>
           </div>
         </div>
 
