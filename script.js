@@ -44,6 +44,8 @@ const roomCodeBadge = document.getElementById("roomCodeBadge");
 const playerBadge = document.getElementById("playerBadge");
 const shareLinkInput = document.getElementById("shareLinkInput");
 const copyInviteBtn = document.getElementById("copyInviteBtn");
+const copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
+const telegramInviteBtn = document.getElementById("telegramInviteBtn");
 const scoreboard = document.getElementById("scoreboard");
 const scoreLabels = scoreboard ? scoreboard.querySelectorAll(".score-box span") : [];
 
@@ -195,6 +197,8 @@ playAgainBtn.addEventListener("click", () => {
   resetBoard();
 });
 copyInviteBtn.addEventListener("click", copyInviteLink);
+copyRoomCodeBtn.addEventListener("click", copyRoomCode);
+telegramInviteBtn.addEventListener("click", shareTelegramRoomInvite);
 
 if (hasSupabaseConfig) {
   void tryJoinRoomFromUrl();
@@ -1443,8 +1447,9 @@ function updateOnlineRoomPanel() {
   playerBadge.textContent = onlineVariant === "chaos"
     ? `Ты играешь за: ${onlinePlayerSymbol} · 4x4 хаос`
     : `Ты играешь за: ${onlinePlayerSymbol} · 3x3`;
-  shareLinkInput.value = getRoomInviteLink(onlineRoomCode);
-  copyInviteBtn.textContent = isTelegramMiniApp() ? "Пригласить" : "Копировать";
+  shareLinkInput.value = getWebRoomInviteLink(onlineRoomCode);
+  copyInviteBtn.textContent = "Копировать ссылку";
+  telegramInviteBtn.classList.toggle("hidden", !isTelegramMiniApp());
 }
 
 function updateOnlineSetupHint() {
@@ -2238,21 +2243,6 @@ async function copyInviteLink() {
     return;
   }
 
-  if (isTelegramMiniApp()) {
-    const shareText = encodeURIComponent("Заходи, создал комнату в крестики-нолики. В таком режиме тебе выиграть меня без шансов)00)");
-    const inviteUrl = encodeURIComponent(shareLinkInput.value);
-    const shareUrl = `https://t.me/share/url?url=${inviteUrl}&text=${shareText}`;
-
-    try {
-      telegramWebApp.openTelegramLink?.(shareUrl);
-    } catch (error) {
-      window.open(shareUrl, "_blank", "noopener,noreferrer");
-    }
-
-    showResultBanner("Выбери чат в Telegram и отправь приглашение.");
-    return;
-  }
-
   try {
     await navigator.clipboard.writeText(shareLinkInput.value);
     showResultBanner("Ссылка скопирована.");
@@ -2260,6 +2250,37 @@ async function copyInviteLink() {
     shareLinkInput.select();
     showResultBanner("Скопируй ссылку вручную из поля.");
   }
+}
+
+async function copyRoomCode() {
+  if (!onlineRoomCode) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(onlineRoomCode);
+    showResultBanner("Код комнаты скопирован.");
+  } catch (error) {
+    showResultBanner(`Код комнаты: ${onlineRoomCode}`);
+  }
+}
+
+function shareTelegramRoomInvite() {
+  if (!isTelegramMiniApp() || !onlineRoomCode) {
+    return;
+  }
+
+  const shareText = encodeURIComponent("Заходи, создал комнату в крестики-нолики. В таком режиме тебе выиграть меня без шансов)00)");
+  const inviteUrl = encodeURIComponent(getTelegramRoomInviteLink(onlineRoomCode));
+  const shareUrl = `https://t.me/share/url?url=${inviteUrl}&text=${shareText}`;
+
+  try {
+    telegramWebApp.openTelegramLink?.(shareUrl);
+  } catch (error) {
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  }
+
+  showResultBanner("Выбери чат в Telegram и отправь приглашение.");
 }
 
 function shareTelegramMiniApp() {
@@ -2298,11 +2319,7 @@ function getTelegramRoomInviteLink(roomCode) {
   return `https://t.me/${TELEGRAM_BOT_USERNAME}?startapp=room_${normalizedCode}`;
 }
 
-function getRoomInviteLink(roomCode) {
-  if (isTelegramMiniApp()) {
-    return getTelegramRoomInviteLink(roomCode);
-  }
-
+function getWebRoomInviteLink(roomCode) {
   return `${window.location.origin}${window.location.pathname}?room=${normalizeRoomCode(roomCode)}`;
 }
 
