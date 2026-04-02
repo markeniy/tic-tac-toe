@@ -66,6 +66,7 @@ const STREAK_STORAGE_KEY = "ticTacToeStreaks";
 const ONLINE_ROOM_TTL_MS = 30 * 60 * 1000;
 const ANNOUNCER_VOICE_ENABLED = false;
 const ANNOUNCER_AUDIO_BASE = "./assets/announcer";
+const ANNOUNCER_AUDIO_VOLUME = 0.7;
 const ANNOUNCER_STREAKS = [
   null,
   null,
@@ -1297,7 +1298,7 @@ function announceStreak(announcerEvent) {
     utterance.voice = announcerVoice;
     utterance.rate = 0.92;
     utterance.pitch = 0.78;
-    utterance.volume = 1;
+    utterance.volume = ANNOUNCER_AUDIO_VOLUME;
     window.speechSynthesis.speak(utterance);
   } catch (error) {
     // Ignore announcer failures and keep gameplay uninterrupted.
@@ -1313,12 +1314,14 @@ function playAnnouncerAudio(filename) {
   if (!audio) {
     audio = new Audio(`${ANNOUNCER_AUDIO_BASE}/${filename}`);
     audio.preload = "auto";
+    audio.volume = ANNOUNCER_AUDIO_VOLUME;
     announcerAudio.set(filename, audio);
   }
 
   try {
     audio.pause();
     audio.currentTime = 0;
+    audio.volume = ANNOUNCER_AUDIO_VOLUME;
     void audio.play().catch(() => {});
     return true;
   } catch (error) {
@@ -2058,12 +2061,12 @@ function playSound(type) {
   const now = context.currentTime;
 
   if (type === "moveX") {
-    tapSound(context, now, 980, 0.024, 0.032);
+    tapSound(context, now, 980, 0.024, 0.042);
     return;
   }
 
   if (type === "moveO") {
-    tapSound(context, now, 840, 0.026, 0.033);
+    tapSound(context, now, 840, 0.026, 0.043);
     return;
   }
 
