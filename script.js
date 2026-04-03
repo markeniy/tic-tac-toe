@@ -1,13 +1,23 @@
-const menuScreen = document.getElementById("menuScreen");
+﻿const menuScreen = document.getElementById("menuScreen");
 const gameScreen = document.getElementById("gameScreen");
 
-const twoPlayersBtn = document.getElementById("twoPlayersBtn");
-const aiModeBtn = document.getElementById("aiModeBtn");
-const onlineModeBtn = document.getElementById("onlineModeBtn");
+const playEntryBtn = document.getElementById("playEntryBtn");
+const settingsEntryBtn = document.getElementById("settingsEntryBtn");
+const rulesEntryBtn = document.getElementById("rulesEntryBtn");
 const tgShareAppBtn = document.getElementById("tgShareAppBtn");
 const flowModal = document.getElementById("flowModal");
 const flowBackBtn = document.getElementById("flowBackBtn");
 const flowCloseBtn = document.getElementById("flowCloseBtn");
+const flowPlayScreen = document.getElementById("flowPlayScreen");
+const flowSettingsScreen = document.getElementById("flowSettingsScreen");
+const flowRulesScreen = document.getElementById("flowRulesScreen");
+const flowPlayLocalBtn = document.getElementById("flowPlayLocalBtn");
+const flowPlayAiBtn = document.getElementById("flowPlayAiBtn");
+const flowPlayOnlineBtn = document.getElementById("flowPlayOnlineBtn");
+const flowSettingsSoundBtn = document.getElementById("flowSettingsSoundBtn");
+const flowSettingsAnnouncerBtn = document.getElementById("flowSettingsAnnouncerBtn");
+const flowSettingsThemeBtn = document.getElementById("flowSettingsThemeBtn");
+const flowSettingsHapticsBtn = document.getElementById("flowSettingsHapticsBtn");
 const flowLocalModeScreen = document.getElementById("flowLocalModeScreen");
 const flowAiModeScreen = document.getElementById("flowAiModeScreen");
 const flowAiDifficultyScreen = document.getElementById("flowAiDifficultyScreen");
@@ -106,6 +116,8 @@ let pendingAiVariant = "standard";
 let boardLocked = false;
 let currentTheme = localStorage.getItem("ticTacToeTheme") || "dark";
 let soundEnabled = localStorage.getItem("ticTacToeSound") !== "off";
+let announcerEnabled = localStorage.getItem("ticTacToeAnnouncer") !== "off";
+let hapticsEnabled = localStorage.getItem("ticTacToeHaptics") !== "off";
 let botDifficulty = localStorage.getItem("ticTacToeDifficulty") || "medium";
 let audioContext = null;
 let onlineChannel = null;
@@ -146,14 +158,22 @@ updateOnlineSetupHint();
 applyOnlineVariantButtons();
 primeAnnouncerVoices();
 updateTelegramEntryPoint();
+updateSettingsButtons();
 
 if (topActions && themeToggleBtnGame && modeLabel) {
   topActions.insertBefore(themeToggleBtnGame, modeLabel);
 }
 
-twoPlayersBtn.addEventListener("click", () => openFlowScreen("local-mode"));
-aiModeBtn.addEventListener("click", () => openFlowScreen("ai-mode"));
-onlineModeBtn.addEventListener("click", () => openFlowScreen("online-entry"));
+playEntryBtn.addEventListener("click", () => openFlowScreen("play"));
+settingsEntryBtn.addEventListener("click", () => openFlowScreen("settings"));
+rulesEntryBtn.addEventListener("click", () => openFlowScreen("rules"));
+flowPlayLocalBtn.addEventListener("click", () => openFlowScreen("local-mode", { pushHistory: true }));
+flowPlayAiBtn.addEventListener("click", () => openFlowScreen("ai-mode", { pushHistory: true }));
+flowPlayOnlineBtn.addEventListener("click", () => openFlowScreen("online-entry", { pushHistory: true }));
+flowSettingsSoundBtn.addEventListener("click", toggleSound);
+flowSettingsAnnouncerBtn.addEventListener("click", toggleAnnouncer);
+flowSettingsThemeBtn.addEventListener("click", toggleTheme);
+flowSettingsHapticsBtn.addEventListener("click", toggleHaptics);
 tgShareAppBtn.addEventListener("click", shareTelegramMiniApp);
 flowBackBtn.addEventListener("click", goBackFlowScreen);
 flowCloseBtn.addEventListener("click", closeFlowModal);
@@ -230,11 +250,15 @@ function updateTelegramEntryPoint() {
     return;
   }
 
-  tgShareAppBtn.classList.toggle("hidden", !isTelegramMiniApp());
+  tgShareAppBtn.textContent = isTelegramMiniApp() ? "Позвать друга в игру" : "Поделиться игрой";
+  tgShareAppBtn.classList.remove("hidden");
 }
 
 function openFlowScreen(screen, options = {}) {
   const screens = {
+    play: flowPlayScreen,
+    settings: flowSettingsScreen,
+    rules: flowRulesScreen,
     "local-mode": flowLocalModeScreen,
     "ai-mode": flowAiModeScreen,
     "ai-difficulty": flowAiDifficultyScreen,
@@ -564,7 +588,7 @@ function createBoardCells() {
     cell.type = "button";
     cell.className = "cell";
     cell.dataset.index = String(index);
-    cell.setAttribute("aria-label", `Клетка ${index + 1}`);
+  cell.setAttribute("aria-label", `Клетка ${index + 1}`);
     cell.addEventListener("click", () => handleCellClick(index));
     boardNode.appendChild(cell);
     cells.push(cell);
@@ -1100,7 +1124,7 @@ function updateModeLabel() {
   }
 
   if (gameMode === "ai") {
-    modeLabel.textContent = "Режим: против компьютера";
+    modeLabel.textContent = `Режим: 3x3 против компьютера\nСложность: ${getDifficultyLabel()}`;
     return;
   }
 
@@ -1110,11 +1134,11 @@ function updateModeLabel() {
   }
 
   if (gameMode === "chaos-ai") {
-    modeLabel.textContent = "Режим: 4x4 хаос против компьютера";
+    modeLabel.textContent = `Режим: 4x4 хаос против компьютера\nСложность: ${getDifficultyLabel()}`;
     return;
   }
 
-  modeLabel.textContent = "Режим: вдвоём";
+  modeLabel.textContent = "Режим: 3x3 вдвоём";
 }
 
 function saveScores() {
@@ -1315,6 +1339,10 @@ function pickAnnouncerVoice(voices) {
 }
 
 function announceStreak(announcerEvent) {
+  if (!announcerEnabled) {
+    return;
+  }
+
   if (announcerEvent?.file && playAnnouncerAudio(announcerEvent.file)) {
     return;
   }
@@ -1339,7 +1367,7 @@ function announceStreak(announcerEvent) {
 }
 
 function playAnnouncerAudio(filename) {
-  if (!soundEnabled || !filename) {
+  if (!soundEnabled || !announcerEnabled || !filename) {
     return false;
   }
 
@@ -1367,6 +1395,7 @@ function toggleTheme() {
   applyTheme();
   syncTelegramChromeColors();
   localStorage.setItem("ticTacToeTheme", currentTheme);
+  updateSettingsButtons();
   playSound("toggle");
 }
 
@@ -1381,6 +1410,7 @@ function toggleSound() {
   soundEnabled = !soundEnabled;
   localStorage.setItem("ticTacToeSound", soundEnabled ? "on" : "off");
   updateSoundButton();
+  updateSettingsButtons();
 
   if (soundEnabled) {
     playSound("toggle");
@@ -1389,6 +1419,53 @@ function toggleSound() {
 
 function updateSoundButton() {
   soundToggleBtn.textContent = soundEnabled ? "Звук: вкл" : "Звук: выкл";
+}
+
+function toggleAnnouncer() {
+  announcerEnabled = !announcerEnabled;
+  localStorage.setItem("ticTacToeAnnouncer", announcerEnabled ? "on" : "off");
+  updateSettingsButtons();
+
+  if (soundEnabled) {
+    playSound("toggle");
+  }
+}
+
+function toggleHaptics() {
+  if (!isTelegramMiniApp()) {
+    return;
+  }
+
+  hapticsEnabled = !hapticsEnabled;
+  localStorage.setItem("ticTacToeHaptics", hapticsEnabled ? "on" : "off");
+  updateSettingsButtons();
+
+  if (soundEnabled) {
+    playSound("toggle");
+  }
+}
+
+function updateSettingsButtons() {
+  if (flowSettingsSoundBtn) {
+    flowSettingsSoundBtn.textContent = `Основной звук: ${soundEnabled ? "вкл" : "выкл"}`;
+  }
+
+  if (flowSettingsAnnouncerBtn) {
+    flowSettingsAnnouncerBtn.textContent = `Озвучка серий: ${announcerEnabled ? "вкл" : "выкл"}`;
+  }
+
+  if (flowSettingsThemeBtn) {
+    flowSettingsThemeBtn.textContent = `Тема: ${currentTheme === "dark" ? "тёмная" : "светлая"}`;
+  }
+
+  if (flowSettingsHapticsBtn) {
+    const telegramOnly = isTelegramMiniApp();
+    flowSettingsHapticsBtn.classList.toggle("hidden", !telegramOnly);
+
+    if (telegramOnly) {
+      flowSettingsHapticsBtn.textContent = `Тактильный отклик: ${hapticsEnabled ? "вкл" : "выкл"}`;
+    }
+  }
 }
 
 function setDifficulty(level) {
@@ -1412,19 +1489,17 @@ function syncDifficultyButtons() {
 
 function updateDifficultyBadge() {
   if (isOnlineMode()) {
-    difficultyBadge.textContent = onlineVariant === "chaos"
-      ? `Ты: ${onlinePlayerSymbol || "?"} · 4x4`
-      : `Ты: ${onlinePlayerSymbol || "?"}`;
+    difficultyBadge.textContent = "Онлайн с другом";
     return;
   }
 
   if (isComputerMode()) {
-    difficultyBadge.textContent = `Бот: ${getDifficultyLabel()}`;
+    difficultyBadge.textContent = "С ботом";
     return;
   }
 
   if (isChaosMode()) {
-    difficultyBadge.textContent = "Особый режим";
+    difficultyBadge.textContent = "Локальная игра";
     return;
   }
 
@@ -1460,7 +1535,7 @@ function updateOnlineRoomPanel() {
     : `Ты играешь за: ${onlinePlayerSymbol} · 3x3`;
   shareLinkInput.value = getWebRoomInviteLink(onlineRoomCode);
   copyInviteBtn.textContent = "Копировать ссылку";
-  telegramInviteBtn.classList.toggle("hidden", !isTelegramMiniApp());
+  telegramInviteBtn.classList.remove("hidden");
   onlineRoomPanel.classList.toggle("collapsed", isOnlineRoomPanelCollapsed);
   toggleRoomPanelBtn.textContent = isOnlineRoomPanelCollapsed ? "Показать" : "Скрыть";
 }
@@ -2284,7 +2359,7 @@ async function copyRoomCode() {
 }
 
 function shareTelegramRoomInvite() {
-  if (!isTelegramMiniApp() || !onlineRoomCode) {
+  if (!onlineRoomCode) {
     return;
   }
 
@@ -2292,35 +2367,56 @@ function shareTelegramRoomInvite() {
   const inviteUrl = encodeURIComponent(getTelegramRoomInviteLink(onlineRoomCode));
   const shareUrl = `https://t.me/share/url?url=${inviteUrl}&text=${shareText}`;
 
-  try {
-    telegramWebApp.openTelegramLink?.(shareUrl);
-  } catch (error) {
+  if (isTelegramMiniApp()) {
+    try {
+      telegramWebApp.openTelegramLink?.(shareUrl);
+    } catch (error) {
+      window.open(shareUrl, "_blank", "noopener,noreferrer");
+    }
+  } else {
     window.open(shareUrl, "_blank", "noopener,noreferrer");
   }
 
   showResultBanner("Выбери чат в Telegram и отправь приглашение.");
 }
 
-function shareTelegramMiniApp() {
-  if (!isTelegramMiniApp()) {
+async function shareTelegramMiniApp() {
+  const appUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?startapp`;
+  const rawText = "Заходи, создал комнату в крестики-нолики. В таком режиме тебе выиграть меня без шансов)00)";
+  const shareText = encodeURIComponent(rawText);
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${shareText}`;
+
+  if (isTelegramMiniApp()) {
+    try {
+      telegramWebApp.openTelegramLink?.(shareUrl);
+    } catch (error) {
+      window.open(shareUrl, "_blank", "noopener,noreferrer");
+    }
+
+    showResultBanner("Выбери чат в Telegram и поделись игрой.");
     return;
   }
 
-  const appUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?startapp`;
-  const shareText = encodeURIComponent("Заходи, создал комнату в крестики-нолики. В таком режиме тебе выиграть меня без шансов)00)");
-  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${shareText}`;
-
   try {
-    telegramWebApp.openTelegramLink?.(shareUrl);
+    if (navigator.share) {
+      await navigator.share({
+        title: "Крестики-нолики",
+        text: rawText,
+        url: appUrl
+      });
+      return;
+    }
+
+    await navigator.clipboard.writeText(appUrl);
+    showResultBanner("Ссылка на игру скопирована.");
   } catch (error) {
     window.open(shareUrl, "_blank", "noopener,noreferrer");
+    showResultBanner("Открыли окно для поделиться игрой.");
   }
-
-  showResultBanner("Выбери чат в Telegram и поделись игрой.");
 }
 
 function isTelegramMiniApp() {
-  return Boolean(telegramWebApp && telegramWebApp.initData !== undefined);
+  return Boolean(telegramWebApp && typeof telegramWebApp.initData === "string" && telegramWebApp.initData.length > 0);
 }
 
 function getTelegramStartParam() {
@@ -2458,7 +2554,7 @@ function handleTelegramBack() {
 }
 
 function triggerTelegramHaptic(style = "light") {
-  if (!isTelegramMiniApp()) {
+  if (!isTelegramMiniApp() || !hapticsEnabled) {
     return;
   }
 
@@ -2572,3 +2668,4 @@ function clearSavedOnlineRole(roomCode) {
 function isOnlineMode() {
   return gameMode === "online" || gameMode === "online-chaos";
 }
+

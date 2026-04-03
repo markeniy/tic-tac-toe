@@ -30,12 +30,12 @@
         </div>
 
         <div class="menu-buttons">
-          <button id="twoPlayersBtn" type="button">Локально вдвоём</button>
-          <button id="aiModeBtn" type="button">С ботом</button>
-          <button id="onlineModeBtn" class="secondary-btn" type="button">Онлайн с другом</button>
+          <button id="playEntryBtn" type="button">Играть</button>
+          <button id="settingsEntryBtn" class="secondary-btn" type="button">Настройки</button>
+          <button id="rulesEntryBtn" class="secondary-btn" type="button">Блок правил</button>
         </div>
 
-        <button id="tgShareAppBtn" class="ghost-btn tg-share-app hidden" type="button">Позвать друга в игру</button>
+        <button id="tgShareAppBtn" class="ghost-btn tg-share-app" type="button">Позвать друга в игру</button>
       </div>
 
       <div id="gameScreen" class="screen">
@@ -48,7 +48,7 @@
             <p class="eyebrow">markeniy Edition</p>
             <h1>Крестики-нолики</h1>
           </div>
-          <button id="themeToggleBtnGame" class="icon-btn" type="button" aria-label="Переключить тему">Тема</button>
+          <button id="themeToggleBtnGame" class="icon-btn game-settings-control hidden" type="button" aria-label="Переключить тему">Тема</button>
         </div>
 
         <div id="onlineRoomPanel" class="online-room-panel hidden">
@@ -97,8 +97,8 @@
           <button id="resetAllBtn" class="secondary-btn" type="button">Сбросить всё</button>
         </div>
 
-        <div class="top-actions top-actions-bottom">
-          <button id="soundToggleBtn" class="icon-btn" type="button">Звук: вкл</button>
+        <div class="top-actions top-actions-bottom game-meta-panel">
+          <button id="soundToggleBtn" class="icon-btn game-settings-control hidden" type="button">Звук: вкл</button>
           <div id="difficultyBadge" class="mode-label"></div>
           <div id="modeLabel" class="mode-label"></div>
         </div>
@@ -119,6 +119,58 @@
       <div class="flow-head">
         <button id="flowBackBtn" class="ghost-btn hidden" type="button">Назад</button>
         <button id="flowCloseBtn" class="ghost-btn" type="button">Закрыть</button>
+      </div>
+
+      <div id="flowPlayScreen" class="flow-screen hidden">
+        <h2>Играть</h2>
+        <p>Выберите, как хотите начать матч.</p>
+        <div class="variant-buttons">
+          <button id="flowPlayLocalBtn" type="button">Локально вдвоём</button>
+          <button id="flowPlayAiBtn" type="button">С ботом</button>
+          <button id="flowPlayOnlineBtn" class="secondary-btn" type="button">Онлайн с другом</button>
+        </div>
+      </div>
+
+      <div id="flowSettingsScreen" class="flow-screen hidden">
+        <h2>Настройки</h2>
+        <p>Подстройте звук, озвучку серий, тему и поведение игры под себя.</p>
+        <div class="variant-buttons">
+          <button id="flowSettingsSoundBtn" class="secondary-btn" type="button">Основной звук</button>
+          <button id="flowSettingsAnnouncerBtn" class="secondary-btn" type="button">Озвучка серий</button>
+          <button id="flowSettingsThemeBtn" class="secondary-btn" type="button">Тема</button>
+          <button id="flowSettingsHapticsBtn" class="secondary-btn" type="button">Тактильный отклик</button>
+        </div>
+      </div>
+
+      <div id="flowRulesScreen" class="flow-screen hidden">
+        <h2>Блок правил</h2>
+        <p>Коротко о том, как работают режимы и чего ждать от каждого сценария.</p>
+        <div class="rules-list">
+          <details class="rule-card" open>
+            <summary>Локально вдвоём</summary>
+            <p>Игра на одном устройстве по очереди. Один игрок ходит за X, второй за O.</p>
+          </details>
+          <details class="rule-card">
+            <summary>С ботом</summary>
+            <p>Игра против компьютера. Сначала выбирается поле, потом сложность соперника.</p>
+          </details>
+          <details class="rule-card">
+            <summary>Онлайн с другом</summary>
+            <p>Создайте комнату или подключитесь по коду. Ходы и счёт синхронизируются у обоих игроков.</p>
+          </details>
+          <details class="rule-card">
+            <summary>Классика 3x3</summary>
+            <p>Побеждает тот, кто первым соберёт три своих символа в ряд по горизонтали, вертикали или диагонали.</p>
+          </details>
+          <details class="rule-card">
+            <summary>Хаос 4x4</summary>
+            <p>Поле больше, а пустые клетки могут исчезать. Побеждает тот, у кого на оставшихся клетках всё ещё собрана линия.</p>
+          </details>
+          <details class="rule-card">
+            <summary>Счёт и серии</summary>
+            <p>Победы и ничьи сохраняются. За серии побед игра показывает отдельные эффекты и озвучку.</p>
+          </details>
+        </div>
       </div>
 
       <div id="flowLocalModeScreen" class="flow-screen hidden">
